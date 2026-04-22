@@ -1,19 +1,14 @@
 import { loadStatuses, loadTeam, loadAllowedEmails } from '@/lib/admin-queries';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { redirect } from 'next/navigation';
+import { requireAdminPage } from '@/lib/admin-guard';
+import { AdminOnlyNotice } from '@/components/admin/AdminOnlyNotice';
 import { StatusesAdmin } from '@/components/admin/StatusesAdmin';
 import { TeamAdmin } from '@/components/admin/TeamAdmin';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/admin/login');
-  const { data: tm } = await supabase.from('team_members').select('role').eq('id', user.id).maybeSingle();
-  if (tm?.role !== 'admin') {
-    return <div className="text-[14px]" style={{ color: 'var(--muted)' }}>هذه الصفحة متاحة للأدمن فقط.</div>;
-  }
+  const ctx = await requireAdminPage();
+  if (!ctx.allowed) return <AdminOnlyNotice />;
 
   const [statuses, team, allowed] = await Promise.all([loadStatuses(), loadTeam(), loadAllowedEmails()]);
 

@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 import type { StatusRow } from '@/types/database';
 import { upsertStatus, deleteStatus } from '@/lib/admin-actions';
 import { StatusBadge } from './StatusBadge';
+import { DialogShell, DialogActions, DialogField, DialogInput } from './DialogPrimitives';
 
 export function StatusesAdmin({ statuses }: { statuses: StatusRow[] }) {
   const [editing, setEditing] = useState<Partial<StatusRow> | null>(null);
@@ -97,45 +98,20 @@ function StatusEditDialog({
     is_terminal: initial.is_terminal ?? false,
   });
   return (
-    <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4" onClick={onCancel}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl p-5 border" style={{ background: 'var(--bg)', borderColor: 'var(--rule)' }}>
-        <h3 className="text-[16px] font-semibold mb-4">{form.id ? 'تعديل حالة' : 'حالة جديدة'}</h3>
-        <div className="space-y-3 text-[13px]">
-          <Field label="المفتاح (key)"><Input value={form.key} onChange={(v) => setForm({ ...form, key: v })} dir="ltr" /></Field>
-          <Field label="الاسم بالعربية"><Input value={form.label_ar} onChange={(v) => setForm({ ...form, label_ar: v })} /></Field>
-          <Field label="الاسم بالإنجليزية"><Input value={form.label_en} onChange={(v) => setForm({ ...form, label_en: v })} dir="ltr" /></Field>
-          <Field label="اللون"><input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full h-10 rounded-lg" /></Field>
-          <Field label="الترتيب"><Input value={String(form.position)} onChange={(v) => setForm({ ...form, position: Number(v) || 0 })} dir="ltr" /></Field>
-          <div className="flex items-center gap-4">
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.is_default} onChange={(e) => setForm({ ...form, is_default: e.target.checked })} /> افتراضي للطلبات الجديدة</label>
-            <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.is_terminal} onChange={(e) => setForm({ ...form, is_terminal: e.target.checked })} /> حالة نهائية</label>
-          </div>
-        </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onCancel} className="px-3 py-1.5 rounded-lg border text-[13px]" style={{ borderColor: 'var(--rule)' }}>إلغاء</button>
-          <button onClick={() => onSave(form)} disabled={pending} className="px-3 py-1.5 rounded-lg text-[13px] font-semibold disabled:opacity-60" style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}>حفظ</button>
+    <DialogShell onClose={onCancel}>
+      <h3 className="text-[16px] font-semibold mb-4">{form.id ? 'تعديل حالة' : 'حالة جديدة'}</h3>
+      <div className="space-y-3 text-[13px]">
+        <DialogField label="المفتاح (key)"><DialogInput value={form.key} onChange={(v) => setForm({ ...form, key: v })} dir="ltr" /></DialogField>
+        <DialogField label="الاسم بالعربية"><DialogInput value={form.label_ar} onChange={(v) => setForm({ ...form, label_ar: v })} /></DialogField>
+        <DialogField label="الاسم بالإنجليزية"><DialogInput value={form.label_en} onChange={(v) => setForm({ ...form, label_en: v })} dir="ltr" /></DialogField>
+        <DialogField label="اللون"><input type="color" value={form.color} onChange={(e) => setForm({ ...form, color: e.target.value })} className="w-full h-10 rounded-lg" /></DialogField>
+        <DialogField label="الترتيب"><DialogInput value={String(form.position)} onChange={(v) => setForm({ ...form, position: Number(v) || 0 })} dir="ltr" /></DialogField>
+        <div className="flex items-center gap-4">
+          <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.is_default} onChange={(e) => setForm({ ...form, is_default: e.target.checked })} /> افتراضي للطلبات الجديدة</label>
+          <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.is_terminal} onChange={(e) => setForm({ ...form, is_terminal: e.target.checked })} /> حالة نهائية</label>
         </div>
       </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <div className="text-[12px] mb-1" style={{ color: 'var(--muted)' }}>{label}</div>
-      {children}
-    </div>
-  );
-}
-function Input({ value, onChange, dir }: { value: string; onChange: (v: string) => void; dir?: 'ltr' | 'rtl' }) {
-  return (
-    <input
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      dir={dir}
-      className="w-full px-3 py-2 rounded-lg border bg-transparent outline-none text-[13.5px]"
-      style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}
-    />
+      <DialogActions onCancel={onCancel} onSave={() => onSave(form)} pending={pending} />
+    </DialogShell>
   );
 }

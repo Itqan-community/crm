@@ -196,6 +196,14 @@ create trigger submissions_updated_at before update on public.submissions
 
 -- ---------------------------------------------------------------------
 -- submission_answers
+--
+-- field_key_snap and field_label_snap are SNAPSHOTS of the form_field's
+-- key + bilingual label at submission time. They let the dashboard keep
+-- rendering historical answers correctly even after admins rename, edit,
+-- or remove the underlying field via the form-builder. field_id stays as
+-- a foreign key for joins (e.g. ordering by current position), but it is
+-- nullable + ON DELETE SET NULL so a hard-deleted field doesn't take its
+-- past answers down with it.
 -- ---------------------------------------------------------------------
 create table public.submission_answers (
   id                uuid primary key default gen_random_uuid(),

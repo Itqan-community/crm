@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState, useTransition } from 'react';
 import type { FormCategoryRow } from '@/types/database';
 import { upsertCategory, deleteCategory } from '@/lib/admin-actions';
+import { DialogShell, DialogActions, DialogField, DialogInput } from '../DialogPrimitives';
 
 const ICONS = [
   { value: 'book', label: 'كتاب' },
@@ -111,39 +112,23 @@ function CategoryEditDialog({
     is_active: initial.is_active ?? true,
   });
   return (
-    <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4" onClick={onCancel}>
-      <div onClick={(e) => e.stopPropagation()} className="w-full max-w-md rounded-2xl p-5 border" style={{ background: 'var(--bg)', borderColor: 'var(--rule)' }}>
-        <h3 className="text-[16px] font-semibold mb-4">{form.id ? 'تعديل فئة' : 'فئة جديدة'}</h3>
-        <div className="space-y-3 text-[13px]">
-          <Field label="المفتاح (key)"><Input value={form.key} onChange={(v) => setForm({ ...form, key: v })} dir="ltr" /></Field>
-          <Field label="الاسم بالعربية"><Input value={form.label_ar} onChange={(v) => setForm({ ...form, label_ar: v })} /></Field>
-          <Field label="الاسم بالإنجليزية"><Input value={form.label_en} onChange={(v) => setForm({ ...form, label_en: v })} dir="ltr" /></Field>
-          <Field label="وصف مختصر بالعربية"><Input value={form.hint_ar} onChange={(v) => setForm({ ...form, hint_ar: v })} /></Field>
-          <Field label="وصف مختصر بالإنجليزية"><Input value={form.hint_en} onChange={(v) => setForm({ ...form, hint_en: v })} dir="ltr" /></Field>
-          <Field label="الأيقونة">
-            <select value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} className="w-full px-3 py-2 rounded-lg border bg-transparent text-[13.5px]" style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}>
-              {ICONS.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
-            </select>
-          </Field>
-          <Field label="الترتيب"><Input value={String(form.position)} onChange={(v) => setForm({ ...form, position: Number(v) || 0 })} dir="ltr" /></Field>
-          <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> ظاهرة في النموذج</label>
-        </div>
-        <div className="flex justify-end gap-2 mt-5">
-          <button onClick={onCancel} className="px-3 py-1.5 rounded-lg border text-[13px]" style={{ borderColor: 'var(--rule)' }}>إلغاء</button>
-          <button onClick={() => onSave(form)} disabled={pending} className="px-3 py-1.5 rounded-lg text-[13px] font-semibold disabled:opacity-60" style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}>حفظ</button>
-        </div>
+    <DialogShell onClose={onCancel}>
+      <h3 className="text-[16px] font-semibold mb-4">{form.id ? 'تعديل فئة' : 'فئة جديدة'}</h3>
+      <div className="space-y-3 text-[13px]">
+        <DialogField label="المفتاح (key)"><DialogInput value={form.key} onChange={(v) => setForm({ ...form, key: v })} dir="ltr" /></DialogField>
+        <DialogField label="الاسم بالعربية"><DialogInput value={form.label_ar} onChange={(v) => setForm({ ...form, label_ar: v })} /></DialogField>
+        <DialogField label="الاسم بالإنجليزية"><DialogInput value={form.label_en} onChange={(v) => setForm({ ...form, label_en: v })} dir="ltr" /></DialogField>
+        <DialogField label="وصف مختصر بالعربية"><DialogInput value={form.hint_ar} onChange={(v) => setForm({ ...form, hint_ar: v })} /></DialogField>
+        <DialogField label="وصف مختصر بالإنجليزية"><DialogInput value={form.hint_en} onChange={(v) => setForm({ ...form, hint_en: v })} dir="ltr" /></DialogField>
+        <DialogField label="الأيقونة">
+          <select value={form.icon} onChange={(e) => setForm({ ...form, icon: e.target.value })} className="w-full px-3 py-2 rounded-lg border bg-transparent text-[13.5px]" style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}>
+            {ICONS.map((i) => <option key={i.value} value={i.value}>{i.label}</option>)}
+          </select>
+        </DialogField>
+        <DialogField label="الترتيب"><DialogInput value={String(form.position)} onChange={(v) => setForm({ ...form, position: Number(v) || 0 })} dir="ltr" /></DialogField>
+        <label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} /> ظاهرة في النموذج</label>
       </div>
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (<div><div className="text-[12px] mb-1" style={{ color: 'var(--muted)' }}>{label}</div>{children}</div>);
-}
-function Input({ value, onChange, dir }: { value: string; onChange: (v: string) => void; dir?: 'ltr' | 'rtl' }) {
-  return (
-    <input value={value} onChange={(e) => onChange(e.target.value)} dir={dir}
-      className="w-full px-3 py-2 rounded-lg border bg-transparent outline-none text-[13.5px]"
-      style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }} />
+      <DialogActions onCancel={onCancel} onSave={() => onSave(form)} pending={pending} />
+    </DialogShell>
   );
 }

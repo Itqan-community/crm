@@ -30,9 +30,7 @@ npm run dev        # http://localhost:3000
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | نعم | نفس المكان (publishable key) |
 | `SUPABASE_SERVICE_ROLE_KEY` | نعم | نفس المكان → **Secret keys** (يبدأ بـ `sb_secret_...`). لا تُشارَك ولا تُرفع إلى GitHub. |
 | `NEXT_PUBLIC_SITE_URL` | نعم | رابط النشر (`https://join.itqan.dev`) أو رابط Vercel المؤقت |
-| `RESEND_API_KEY` | اختياري | [resend.com/api-keys](https://resend.com/api-keys). بدونها لن يُرسَل بريد التأكيد. |
-| `RESEND_FROM_EMAIL` | اختياري | الافتراضي `connect@itqan.dev` |
-| `RESEND_FROM_NAME` | اختياري | الافتراضي `Itqan` |
+| `RESEND_API_KEY` | اختياري | [resend.com/api-keys](https://resend.com/api-keys). بدونها لن يُرسَل بريد التأكيد. عنوان المرسِل (`connect@itqan.dev`) واسم المرسِل بالعربي/الإنجليزي يعيشان في `src/lib/notify/email.ts`. |
 | `SLACK_WEBHOOK_URL` | اختياري | Slack App → Incoming Webhooks. بدونه لن يُنبَّه الفريق. |
 | `NEWSLETTER_PROXY_URL` | اختياري | الافتراضي `https://itqan.dev/api/newsletter/subscribe/` (الـ endpoint الحالي لنشرة إتقان/MailerLite). |
 | `MAILERLITE_API_KEY` + `MAILERLITE_GROUP_ID` | اختياري | عند ضبطه يُستخدم مباشرةً بدل البروكسي. |

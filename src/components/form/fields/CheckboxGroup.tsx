@@ -14,7 +14,7 @@ type Props = {
 };
 
 export function CheckboxGroup({ field, value, onChange, error, lang }: Props) {
-  const arr = Array.isArray(value) ? value : value ? [value as unknown as string] : [];
+  const arr = Array.isArray(value) ? value : [];
   const letters = lang === 'en' ? LATIN_LETTERS : ARABIC_LETTERS;
   const toggle = (k: string) => {
     if (!field.is_multi) {

@@ -121,24 +121,28 @@ export async function POST(req: Request) {
     })
     .filter((r): r is NonNullable<typeof r> => r != null);
 
-  if (answerRows.length > 0) {
-    const { error: ansErr } = await supabase.from('submission_answers').insert(answerRows);
-    if (ansErr) {
-      console.error('[api/submissions] answers insert failed', ansErr);
-      // Best-effort cleanup of orphan submission
-      await supabase.from('submissions').delete().eq('id', submissionRows.id);
-      return NextResponse.json({ error: 'answers_insert_failed' }, { status: 500 });
-    }
+  // Insert answers and fetch the category label in parallel — both depend
+  // only on values we already have, so there's no need to serialize them.
+  const [answerInsert, catLookup] = await Promise.all([
+    answerRows.length > 0
+      ? supabase.from('submission_answers').insert(answerRows)
+      : Promise.resolve({ error: null }),
+    supabase
+      .from('form_categories')
+      .select('label_ar, label_en')
+      .eq('id', payload.category_id)
+      .single(),
+  ]);
+
+  if (answerInsert.error) {
+    console.error('[api/submissions] answers insert failed', answerInsert.error);
+    // Best-effort cleanup of orphan submission
+    await supabase.from('submissions').delete().eq('id', submissionRows.id);
+    return NextResponse.json({ error: 'answers_insert_failed' }, { status: 500 });
   }
 
-  // Resolve category label for notifications
-  const { data: catRow } = await supabase
-    .from('form_categories')
-    .select('label_ar, label_en')
-    .eq('id', payload.category_id)
-    .single();
   const categoryLabel = pick(
-    { ar: catRow?.label_ar ?? '', en: catRow?.label_en ?? '' },
+    { ar: catLookup.data?.label_ar ?? '', en: catLookup.data?.label_en ?? '' },
     lang,
   );
 

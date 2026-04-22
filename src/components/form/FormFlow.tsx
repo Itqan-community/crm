@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormCategoryRow, FormFieldRow, Lang } from '@/types/database';
 import { pick, UI, stepOf } from '@/lib/i18n';
 import { validateField } from '@/lib/validation';
@@ -145,22 +145,23 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
     setDirection(-1);
   };
 
-  // Enter to advance
+  // Enter to advance. Use a ref so the listener is attached once instead of
+  // on every render — handler reads always-fresh state via the ref.
+  const advanceRef = useRef<() => void>(() => {});
+  advanceRef.current = () => {
+    if (atField) void goNext();
+  };
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        const t = e.target as HTMLElement | null;
-        if (t && t.tagName === 'TEXTAREA') return;
-        if (atField) {
-          e.preventDefault();
-          void goNext();
-        }
-      }
+      if (e.key !== 'Enter' || e.shiftKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t && t.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      advanceRef.current();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  });
+  }, []);
 
   const Forward = lang === 'en' ? ArrowRight : ArrowLeft;
   const Back = lang === 'en' ? ArrowLeft : ArrowRight;

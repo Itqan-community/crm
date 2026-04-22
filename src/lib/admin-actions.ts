@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from './supabase/server';
+import { EMAIL_REGEX } from './validation';
 
 async function requireTeam() {
   const supabase = await createSupabaseServerClient();
@@ -112,15 +113,13 @@ export async function upsertStatus(input: {
 
 export async function deleteStatus(statusId: string) {
   const { supabase } = await requireAdmin();
-  // Check if any submission still uses this status
-  const { count, error: cntErr } = await supabase
-    .from('submissions')
-    .select('id', { count: 'exact', head: true })
-    .eq('status_id', statusId);
-  if (cntErr) throw new Error(cntErr.message);
-  if ((count ?? 0) > 0) throw new Error('status_in_use');
+  // Try the delete and let the FK constraint refuse if the status is in use.
+  // Avoids a check-then-delete race window.
   const { error } = await supabase.from('statuses').delete().eq('id', statusId);
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (error.code === '23503') throw new Error('status_in_use');
+    throw new Error(error.message);
+  }
   revalidatePath('/admin/settings');
 }
 
@@ -129,7 +128,7 @@ export async function deleteStatus(statusId: string) {
 export async function addAllowedEmail(email: string, role: 'admin' | 'member') {
   const { supabase } = await requireAdmin();
   const e = email.trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw new Error('invalid_email');
+  if (!EMAIL_REGEX.test(e)) throw new Error('invalid_email');
   const { error } = await supabase.from('allowed_emails').upsert({ email: e, role }, { onConflict: 'email' });
   if (error) throw new Error(error.message);
   revalidatePath('/admin/settings');
@@ -189,14 +188,12 @@ export async function upsertCategory(input: {
 
 export async function deleteCategory(categoryId: string) {
   const { supabase } = await requireAdmin();
-  // Check for submissions referencing this category
-  const { count } = await supabase
-    .from('submissions')
-    .select('id', { count: 'exact', head: true })
-    .eq('category_id', categoryId);
-  if ((count ?? 0) > 0) throw new Error('category_in_use');
+  // Same race-free pattern: attempt the delete, translate FK violation.
   const { error } = await supabase.from('form_categories').delete().eq('id', categoryId);
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (error.code === '23503') throw new Error('category_in_use');
+    throw new Error(error.message);
+  }
   revalidatePath('/admin/settings/form-builder');
 }
 

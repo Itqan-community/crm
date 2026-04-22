@@ -1,19 +1,16 @@
 import Link from 'next/link';
-import { redirect, notFound } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { notFound } from 'next/navigation';
+import { requireAdminPage } from '@/lib/admin-guard';
+import { AdminOnlyNotice } from '@/components/admin/AdminOnlyNotice';
 import { FieldsAdmin } from '@/components/admin/form-builder/FieldsAdmin';
 
 export const dynamic = 'force-dynamic';
 
 export default async function CategoryFieldsPage({ params }: { params: Promise<{ categoryId: string }> }) {
   const { categoryId } = await params;
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/admin/login');
-  const { data: tm } = await supabase.from('team_members').select('role').eq('id', user.id).maybeSingle();
-  if (tm?.role !== 'admin') {
-    return <div className="text-[14px]" style={{ color: 'var(--muted)' }}>هذه الصفحة متاحة للأدمن فقط.</div>;
-  }
+  const ctx = await requireAdminPage();
+  if (!ctx.allowed) return <AdminOnlyNotice />;
+  const { supabase } = ctx;
 
   const { data: category } = await supabase.from('form_categories').select('*').eq('id', categoryId).maybeSingle();
   if (!category) notFound();

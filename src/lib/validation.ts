@@ -1,6 +1,11 @@
 import type { FormFieldRow, Lang } from '@/types/database';
 import { UI, pick } from './i18n';
 
+// Pragmatic email shape — we deliberately don't try to be RFC 5322 compliant
+// (no consumer-facing email validator is). Resend will reject malformed
+// addresses authoritatively.
+export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const AR_EN_DIGITS: Record<string, string> = {
   '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
   '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9',
@@ -37,7 +42,7 @@ export function validateField(field: FormFieldRow, value: FieldValue, lang: Lang
   const str = Array.isArray(value) ? value.join(',') : String(value);
 
   if (field.kind === 'email') {
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(str.trim())) return pick(UI.errEmail, lang);
+    if (!EMAIL_REGEX.test(str.trim())) return pick(UI.errEmail, lang);
   }
   if (field.kind === 'phone') {
     if (!isValidE164(str)) return pick(UI.errPhone, lang);

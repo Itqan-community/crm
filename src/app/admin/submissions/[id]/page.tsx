@@ -1,21 +1,76 @@
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { loadStatuses, loadTeam } from '@/lib/admin-queries';
 import { StatusEditor } from '@/components/admin/StatusEditor';
 import { AssigneePicker } from '@/components/admin/AssigneePicker';
 import { NotesPanel } from '@/components/admin/NotesPanel';
 import { ActivityFeed } from '@/components/admin/ActivityFeed';
+import type { Bilingual } from '@/types/database';
 
 export const dynamic = 'force-dynamic';
+
+type AuthorRef = { id: string; full_name: string | null; email: string };
+type CategoryRef = { id: string; key: string; label_ar: string; label_en: string };
+type StatusRef = { id: string; key: string; label_ar: string; label_en: string; color: string };
+
+type SubmissionDetail = {
+  id: string;
+  reference_no: string;
+  language: 'ar' | 'en';
+  created_at: string;
+  updated_at: string;
+  status_id: string;
+  assignee_id: string | null;
+  newsletter_optin: boolean;
+  submitter_name: string;
+  submitter_email: string;
+  category: CategoryRef | null;
+  status: StatusRef | null;
+  assignee: AuthorRef | null;
+};
+
+type AnswerRow = {
+  id: string;
+  field_id: string | null;
+  field_key_snap: string;
+  field_label_snap: Bilingual;
+  value_text: string | null;
+  value_json: unknown;
+  created_at: string;
+  field: { position: number } | null;
+};
+
+type NoteRow = {
+  id: string;
+  body: string;
+  created_at: string;
+  author_id: string;
+  author: AuthorRef | null;
+};
+
+type ActivityRow = {
+  id: string;
+  action: string;
+  meta: Record<string, unknown>;
+  created_at: string;
+  actor: AuthorRef | null;
+};
 
 export default async function SubmissionDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  if (!user) redirect('/admin/login');
 
-  const [{ data: sub }, { data: answers }, { data: notes }, { data: activity }, statuses, team] = await Promise.all([
+  const [
+    { data: subData },
+    { data: answersData },
+    { data: notesData },
+    { data: activityData },
+    statuses,
+    team,
+  ] = await Promise.all([
     supabase
       .from('submissions')
       .select(
@@ -27,9 +82,11 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
       )
       .eq('id', id)
       .maybeSingle(),
+    // Pull the originating field's position in the same query, so we can
+    // restore the form's authoring order without a follow-up roundtrip.
     supabase
       .from('submission_answers')
-      .select('id, field_id, field_key_snap, field_label_snap, value_text, value_json, created_at')
+      .select('id, field_id, field_key_snap, field_label_snap, value_text, value_json, created_at, field:form_fields(position)')
       .eq('submission_id', id),
     supabase
       .from('notes')
@@ -45,25 +102,18 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
     loadTeam(),
   ]);
 
-  if (!sub) notFound();
+  if (!subData) notFound();
+  const sub = subData as unknown as SubmissionDetail;
+  const answers = (answersData ?? []) as unknown as AnswerRow[];
+  const notes = (notesData ?? []) as unknown as NoteRow[];
+  const activity = (activityData ?? []) as unknown as ActivityRow[];
 
   const statusesById = Object.fromEntries(statuses.map((s) => [s.id, { label_ar: s.label_ar }]));
   const teamById = Object.fromEntries(team.map((t) => [t.id, { label: t.full_name || t.email }]));
 
-  // Order answers by their original field position when possible
-  const fieldIdsForOrdering = answers
-    ?.map((a) => a.field_id)
-    .filter((x): x is string => !!x) ?? [];
-  const { data: orderedFields } = fieldIdsForOrdering.length
-    ? await supabase
-        .from('form_fields')
-        .select('id, position')
-        .in('id', fieldIdsForOrdering)
-    : { data: [] as { id: string; position: number }[] };
-  const positionByField = new Map((orderedFields ?? []).map((f) => [f.id, f.position]));
-  const sortedAnswers = (answers ?? []).slice().sort((a, b) => {
-    const pa = positionByField.get(a.field_id ?? '') ?? 9_999;
-    const pb = positionByField.get(b.field_id ?? '') ?? 9_999;
+  const sortedAnswers = answers.slice().sort((a, b) => {
+    const pa = a.field?.position ?? 9_999;
+    const pb = b.field?.position ?? 9_999;
     return pa - pb;
   });
 
@@ -80,7 +130,7 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
           <div className="text-[13px]" style={{ color: 'var(--muted)' }}>
             <span className="font-mono" dir="ltr">{sub.reference_no}</span>
             {' · '}
-            {(sub as any).category?.label_ar}
+            {sub.category?.label_ar}
             {' · '}
             {new Date(sub.created_at).toLocaleString('ar')}
           </div>
@@ -107,12 +157,13 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
             <h3 className="text-[14px] font-semibold mb-4">إجابات النموذج</h3>
             <dl className="space-y-4 text-[13.5px]">
               {sortedAnswers.map((a) => {
-                const label = (a.field_label_snap as { ar: string }).ar;
-                const value = a.value_text != null
-                  ? a.value_text
-                  : Array.isArray(a.value_json)
-                    ? (a.value_json as string[]).join('، ')
-                    : '';
+                const label = a.field_label_snap.ar;
+                const value =
+                  a.value_text != null
+                    ? a.value_text
+                    : Array.isArray(a.value_json)
+                      ? (a.value_json as string[]).join('، ')
+                      : '';
                 return (
                   <div key={a.id}>
                     <dt className="text-[12px] font-medium uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>{label}</dt>
@@ -124,22 +175,8 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
           </section>
         </div>
         <div className="space-y-5">
-          <NotesPanel
-            submissionId={sub.id}
-            currentUserId={user.id}
-            notes={(notes ?? []).map((n: any) => ({
-              id: n.id, body: n.body, created_at: n.created_at, author_id: n.author_id,
-              author: n.author ?? null,
-            }))}
-          />
-          <ActivityFeed
-            activity={(activity ?? []).map((a: any) => ({
-              id: a.id, action: a.action, meta: a.meta, created_at: a.created_at,
-              actor: a.actor ?? null,
-            }))}
-            statusesById={statusesById}
-            teamById={teamById}
-          />
+          <NotesPanel submissionId={sub.id} currentUserId={user.id} notes={notes} />
+          <ActivityFeed activity={activity} statusesById={statusesById} teamById={teamById} />
         </div>
       </div>
     </div>

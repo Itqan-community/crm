@@ -1,6 +1,11 @@
 import { Resend } from 'resend';
 import type { Lang } from '@/types/database';
 
+// Brand identity — same across all environments, lives with the code.
+const FROM_EMAIL = 'connect@itqan.dev';
+const FROM_NAME_AR = 'مجتمع إتقان';
+const FROM_NAME_EN = 'Itqan Community';
+
 type ConfirmationPayload = {
   to: string;
   name: string;
@@ -12,9 +17,8 @@ export async function sendSubmitterConfirmation(p: ConfirmationPayload): Promise
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return false;
 
-  const fromEmail = process.env.RESEND_FROM_EMAIL || 'connect@itqan.dev';
-  const fromName = process.env.RESEND_FROM_NAME || 'Itqan';
-  const from = `${fromName} <${fromEmail}>`;
+  const fromName = p.lang === 'ar' ? FROM_NAME_AR : FROM_NAME_EN;
+  const from = `${fromName} <${FROM_EMAIL}>`;
 
   const subject =
     p.lang === 'ar'
