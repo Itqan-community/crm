@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import type { StatusRow } from '@/types/database';
 import { setSubmissionStatus } from '@/lib/admin-actions';
-import { StatusBadge } from './StatusBadge';
+import { ChevronDown } from '@/components/form/icons';
 
 type Props = {
   submissionId: string;
@@ -14,18 +14,36 @@ type Props = {
 export function StatusEditor({ submissionId, currentStatusId, statuses }: Props) {
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
+  const ref = useRef<HTMLDivElement>(null);
   const current = statuses.find((s) => s.id === currentStatusId);
 
+  useEffect(() => {
+    if (!open) return;
+    const onClick = (e: MouseEvent) => {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', onClick);
+    return () => document.removeEventListener('mousedown', onClick);
+  }, [open]);
+
   return (
-    <div className="relative inline-block">
+    <div className="relative inline-block" ref={ref}>
       <button
+        type="button"
         onClick={() => setOpen((v) => !v)}
         disabled={pending}
-        className="inline-flex items-center gap-2 px-2 py-1 rounded-lg border text-[13px] hover:bg-[var(--option-bg-selected)] transition disabled:opacity-60"
-        style={{ borderColor: 'var(--rule)' }}
+        className="h-9 inline-flex items-center gap-2 px-3 rounded-lg border text-[13px] hover:bg-[var(--option-bg-selected)] transition disabled:opacity-60"
+        style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}
       >
-        {current ? <StatusBadge label={current.label_ar} color={current.color} /> : '—'}
-        <span style={{ color: 'var(--muted)' }}>▾</span>
+        {current ? (
+          <>
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: current.color }} />
+            <span>{current.label_ar}</span>
+          </>
+        ) : (
+          <span>—</span>
+        )}
+        <ChevronDown size={14} className="opacity-60" />
       </button>
       {open && (
         <div
@@ -35,13 +53,15 @@ export function StatusEditor({ submissionId, currentStatusId, statuses }: Props)
           {statuses.map((s) => (
             <button
               key={s.id}
+              type="button"
               onClick={() => {
                 setOpen(false);
                 startTransition(() => setSubmissionStatus(submissionId, s.id));
               }}
-              className="w-full text-start px-3 py-2 rounded-lg text-[13px] hover:bg-[var(--option-bg-selected)] transition"
+              className="w-full text-start px-3 py-2 rounded-lg text-[13px] hover:bg-[var(--option-bg-selected)] transition flex items-center gap-2"
             >
-              <StatusBadge label={s.label_ar} color={s.color} />
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: s.color }} />
+              <span>{s.label_ar}</span>
             </button>
           ))}
         </div>

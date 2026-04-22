@@ -36,7 +36,7 @@ export async function POST(req: Request) {
   const admin = createSupabaseAdminClient();
   const { data: allowed } = await admin
     .from('allowed_emails')
-    .select('email, role')
+    .select('email, role, full_name')
     .ilike('email', email)
     .maybeSingle();
 
@@ -48,11 +48,12 @@ export async function POST(req: Request) {
   // Bootstrap the team_members row. Idempotent — handles both first sign-in
   // (DB trigger may have fired) and repeat sign-ins for users who were
   // added to allowed_emails after their auth.users row was created.
+  const fullName = allowed.full_name || data.user.user_metadata?.full_name || email;
   await admin.from('team_members').upsert(
     {
       id: data.user.id,
       email,
-      full_name: data.user.user_metadata?.full_name || email,
+      full_name: fullName,
       role: allowed.role,
     },
     { onConflict: 'id' },

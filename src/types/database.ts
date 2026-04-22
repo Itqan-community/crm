@@ -65,6 +65,7 @@ export interface TeamMemberRow {
 
 export interface AllowedEmailRow {
   email: string;
+  full_name: string | null;
   role: 'admin' | 'member';
   created_at: string;
 }

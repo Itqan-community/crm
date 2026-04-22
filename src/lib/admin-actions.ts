@@ -125,12 +125,21 @@ export async function deleteStatus(statusId: string) {
 
 // ----- team & allowed_emails -----
 
-export async function addAllowedEmail(email: string, role: 'admin' | 'member') {
+export async function addAllowedEmail(email: string, role: 'admin' | 'member', fullName?: string) {
   const { supabase } = await requireAdmin();
   const e = email.trim().toLowerCase();
   if (!EMAIL_REGEX.test(e)) throw new Error('invalid_email');
-  const { error } = await supabase.from('allowed_emails').upsert({ email: e, role }, { onConflict: 'email' });
+  const name = fullName?.trim() || null;
+  const { error } = await supabase
+    .from('allowed_emails')
+    .upsert({ email: e, role, full_name: name }, { onConflict: 'email' });
   if (error) throw new Error(error.message);
+  // Keep an existing team_members row in sync if the user has already signed in.
+  if (name) {
+    await supabase.from('team_members').update({ full_name: name, role }).eq('email', e);
+  } else {
+    await supabase.from('team_members').update({ role }).eq('email', e);
+  }
   revalidatePath('/admin/settings');
 }
 
