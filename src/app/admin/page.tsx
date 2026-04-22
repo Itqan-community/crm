@@ -1,0 +1,94 @@
+import Link from 'next/link';
+import { FilterBar } from '@/components/admin/FilterBar';
+import { StatusBadge } from '@/components/admin/StatusBadge';
+import {
+  loadSubmissions,
+  loadStatuses,
+  loadCategories,
+  loadTeam,
+} from '@/lib/admin-queries';
+
+export const dynamic = 'force-dynamic';
+
+export default async function AdminHome({
+  searchParams,
+}: {
+  searchParams: Promise<{ q?: string; category?: string; status?: string; assignee?: string }>;
+}) {
+  const sp = await searchParams;
+  const [rows, statuses, categories, team] = await Promise.all([
+    loadSubmissions(sp),
+    loadStatuses(),
+    loadCategories(true),
+    loadTeam(),
+  ]);
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between mb-4">
+        <h1 className="text-[22px] font-semibold">الطلبات</h1>
+        <span className="text-[13px]" style={{ color: 'var(--muted)' }}>{rows.length} نتيجة</span>
+      </div>
+
+      <FilterBar categories={categories} statuses={statuses} team={team} />
+
+      <div className="border rounded-xl overflow-hidden" style={{ borderColor: 'var(--rule)' }}>
+        <table className="w-full text-[13.5px]">
+          <thead style={{ background: 'var(--option-bg-selected)' }}>
+            <tr style={{ color: 'var(--muted)' }}>
+              <Th>الرقم المرجعي</Th>
+              <Th>الاسم</Th>
+              <Th>الفئة</Th>
+              <Th>الحالة</Th>
+              <Th>المسؤول</Th>
+              <Th>التاريخ</Th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center" style={{ color: 'var(--muted)' }}>
+                  لا توجد طلبات تطابق هذه الفلاتر.
+                </td>
+              </tr>
+            )}
+            {rows.map((r) => (
+              <tr key={r.id} className="border-t hover:bg-[var(--option-bg-selected)] transition" style={{ borderColor: 'var(--rule-soft)' }}>
+                <Td>
+                  <Link href={`/admin/submissions/${r.id}`} className="font-mono text-[12.5px]" style={{ color: 'var(--accent-strong)' }}>
+                    {r.reference_no}
+                  </Link>
+                </Td>
+                <Td>
+                  <div className="font-medium">{r.submitter_name}</div>
+                  <div className="text-[12px]" style={{ color: 'var(--muted)' }} dir="ltr">{r.submitter_email}</div>
+                </Td>
+                <Td>{r.category?.label_ar || '—'}</Td>
+                <Td>
+                  {r.status ? <StatusBadge label={r.status.label_ar} color={r.status.color} /> : '—'}
+                </Td>
+                <Td>
+                  {r.assignee ? (r.assignee.full_name || r.assignee.email) : (
+                    <span style={{ color: 'var(--muted)' }}>بدون</span>
+                  )}
+                </Td>
+                <Td>
+                  <span title={new Date(r.created_at).toLocaleString('ar')}>
+                    {new Date(r.created_at).toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'short', day: 'numeric' })}
+                  </span>
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return <th className="px-4 py-3 text-start font-medium text-[12px] uppercase tracking-wider">{children}</th>;
+}
+function Td({ children }: { children: React.ReactNode }) {
+  return <td className="px-4 py-3 align-middle">{children}</td>;
+}

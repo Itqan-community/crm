@@ -1,0 +1,107 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ---- Imported verbatim from the design's index.html ---- */
+
+html, body {
+  -webkit-font-smoothing: antialiased;
+  font-family: var(--font-body, 'Rubik'), system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+/* ---- THEMES (4 visual variants — exact from design) ---- */
+:root[data-theme="olive"] {
+  --bg: #FAF6F0;
+  --fg: #1F2A24;
+  --muted: #6B6B68;
+  --rule: rgba(27,67,50,0.16);
+  --rule-soft: rgba(27,67,50,0.08);
+  --accent: #1B4332;
+  --accent-strong: #1B4332;
+  --accent-fg: #FAF6F0;
+  --option-bg: #FFFFFF;
+  --option-bg-selected: #F1EFE7;
+  --option-border: rgba(27,67,50,0.12);
+  --option-border-hover: rgba(27,67,50,0.3);
+  --danger: #B0493A;
+  --font-body: 'Rubik';
+  --font-display: 'Rubik';
+}
+:root[data-theme="paper"] {
+  --bg: #F7F4EE;
+  --fg: #242424;
+  --muted: #767674;
+  --rule: rgba(0,0,0,0.14);
+  --rule-soft: rgba(0,0,0,0.06);
+  --accent: #2D2D2D;
+  --accent-strong: #1B4332;
+  --accent-fg: #FAF6F0;
+  --option-bg: transparent;
+  --option-bg-selected: rgba(27,67,50,0.06);
+  --option-border: rgba(0,0,0,0.12);
+  --option-border-hover: rgba(0,0,0,0.28);
+  --danger: #9A3D2F;
+  --font-body: 'IBM Plex Sans Arabic';
+  --font-display: 'IBM Plex Sans Arabic';
+}
+:root[data-theme="gold"] {
+  --bg: #FBF7EF;
+  --fg: #2A231C;
+  --muted: #7A6E60;
+  --rule: rgba(176,137,104,0.35);
+  --rule-soft: rgba(176,137,104,0.18);
+  --accent: #946E52;
+  --accent-strong: #77573F;
+  --accent-fg: #FBF7EF;
+  --option-bg: #FFFDF8;
+  --option-bg-selected: #F4EADC;
+  --option-border: rgba(176,137,104,0.25);
+  --option-border-hover: rgba(176,137,104,0.5);
+  --danger: #A0452C;
+  --font-body: 'Rubik';
+  --font-display: 'Rubik';
+}
+:root[data-theme="deep"] {
+  --bg: #122A20;
+  --fg: #F1E9D8;
+  --muted: #9FB5A7;
+  --rule: rgba(241,233,216,0.2);
+  --rule-soft: rgba(241,233,216,0.1);
+  --accent: #D4B483;
+  --accent-strong: #E6C99A;
+  --accent-fg: #122A20;
+  --option-bg: rgba(241,233,216,0.04);
+  --option-bg-selected: rgba(212,180,131,0.14);
+  --option-border: rgba(241,233,216,0.18);
+  --option-border-hover: rgba(212,180,131,0.5);
+  --danger: #E89B86;
+  --font-body: 'Rubik';
+  --font-display: 'Scheherazade New';
+}
+
+/* Slide animations */
+.slide-in-ltr { animation: slideInL .45s cubic-bezier(.2,.7,.2,1) both; }
+.slide-in-rtl { animation: slideInR .45s cubic-bezier(.2,.7,.2,1) both; }
+@keyframes slideInL {
+  from { opacity: 0; transform: translateX(-28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slideInR {
+  from { opacity: 0; transform: translateX(28px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* Selection */
+::selection { background: var(--accent); color: var(--accent-fg); }
+
+/* Display headings can opt into display font */
+h1, h2 { font-family: var(--font-display, inherit); }
+
+/* Focus */
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 6px;
+}
