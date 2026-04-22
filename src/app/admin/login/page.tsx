@@ -23,7 +23,7 @@ async function LoginPageInner({ sp }: { sp: Promise<{ next?: string; error?: str
         </div>
         <h1 className="text-[28px] font-semibold mb-3" style={{ color: 'var(--fg)' }}>تسجيل الدخول</h1>
         <p className="text-[14px] mb-6 leading-7" style={{ color: 'var(--muted)' }}>
-          أدخل بريدك المسجّل ضمن فريق إتقان، وسنرسل لك رابط دخول سحري إلى بريدك.
+          أدخل بريدك المسجّل ضمن فريق إتقان، وسنرسل لك رمز دخول مكوّن من ٦ أرقام.
         </p>
         <LoginForm next={next} initialError={error} />
       </div>
