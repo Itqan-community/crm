@@ -13,8 +13,12 @@ export function LoginForm({ next, initialError }: { next?: string; initialError?
     setStatus('sending');
     setError(null);
     const supabase = createSupabaseBrowserClient();
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-    const callback = `${siteUrl}/admin/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ''}`;
+    // Always send the user back to the origin they signed in from. Using
+    // window.location.origin (instead of NEXT_PUBLIC_SITE_URL) means a magic
+    // link sent from a Vercel preview deployment correctly returns to that
+    // preview, and admins can sign in from any host that's been added to
+    // Supabase's Auth → Redirect URLs allow-list.
+    const callback = `${window.location.origin}/admin/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ''}`;
     const { error: err } = await supabase.auth.signInWithOtp({
       email: email.trim().toLowerCase(),
       options: { emailRedirectTo: callback, shouldCreateUser: true },

@@ -9,7 +9,9 @@ export async function GET(request: NextRequest) {
   const url = request.nextUrl;
   const code = url.searchParams.get('code');
   const next = url.searchParams.get('next') || '/admin';
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || url.origin;
+  // Use the request's own origin so the redirect always returns to the host
+  // the user signed in from (Vercel preview, custom domain, localhost, …).
+  const siteUrl = url.origin;
 
   if (!code) {
     return NextResponse.redirect(new URL('/admin/login?error=missing_code', siteUrl));
