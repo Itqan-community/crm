@@ -138,7 +138,7 @@ export function PhoneInput({
           value={value || ''}
           onChange={onChange}
           countries={PHONE_COUNTRIES}
-          inputProps={{ dir: 'ltr' }}
+          inputProps={{ dir: 'ltr', autoComplete: 'tel', name: 'phone' }}
         />
       </div>
       <ErrorNote>{error}</ErrorNote>
