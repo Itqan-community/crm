@@ -25,7 +25,7 @@ export function ViewToggle({ current }: { current: AdminView }) {
       <ViewButton active={current === 'table'} onClick={() => change('table')} label="جدول">
         <TableIcon />
       </ViewButton>
-      <ViewButton active={current === 'kanban'} onClick={() => change('kanban')} label="كانبان">
+      <ViewButton active={current === 'kanban'} onClick={() => change('kanban')} label="بطاقات">
         <KanbanIcon />
       </ViewButton>
     </div>
