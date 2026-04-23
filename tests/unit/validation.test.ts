@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import {
   EMAIL_REGEX,
-  isValidE164,
   normalizePhoneInput,
+  parsePhoneSmart,
   validateField,
 } from '@/lib/validation';
 import type { FormFieldRow } from '@/types/database';
@@ -65,18 +65,45 @@ describe('normalizePhoneInput', () => {
   });
 });
 
-describe('isValidE164', () => {
-  it.each<[string, boolean]>([
-    ['+966551234567', true],
-    ['+15551234567', true],
-    ['+٩٦٦٥٥١٢٣٤٥٦٧', true],     // Arabic-Indic digits
-    ['966551234567', false],       // missing +
-    ['+0551234567', false],        // starts with 0 after +
-    ['+12', false],                // too short
-    ['+12345678901234567', false], // too long
-    ['', false],
-  ])('isValidE164(%s) -> %s', (input, expected) => {
-    expect(isValidE164(input)).toBe(expected);
+describe('parsePhoneSmart', () => {
+  it('parses SA national format with defaultCountry', () => {
+    const r = parsePhoneSmart('0551234567', 'SA');
+    expect(r.valid).toBe(true);
+    if (r.valid) expect(r.e164).toBe('+966551234567');
+  });
+  it('parses SA national with spaces + dashes', () => {
+    const r = parsePhoneSmart('055-123-4567', 'SA');
+    expect(r.valid).toBe(true);
+    if (r.valid) expect(r.e164).toBe('+966551234567');
+  });
+  it('parses Arabic-Indic digits', () => {
+    const r = parsePhoneSmart('٠٥٥١٢٣٤٥٦٧', 'SA');
+    expect(r.valid).toBe(true);
+    if (r.valid) expect(r.e164).toBe('+966551234567');
+  });
+  it('parses international format without defaultCountry', () => {
+    const r = parsePhoneSmart('+966 55 123 4567');
+    expect(r.valid).toBe(true);
+    if (r.valid) expect(r.e164).toBe('+966551234567');
+  });
+  it('flags a too-short number', () => {
+    const r = parsePhoneSmart('+12', 'SA');
+    expect(r.valid).toBe(false);
+    if (!r.valid) expect(r.errorKey).toBe('short');
+  });
+  it('flags a number with no recognisable country', () => {
+    const r = parsePhoneSmart('12345678');
+    expect(r.valid).toBe(false);
+    if (!r.valid) expect(r.errorKey).toBe('country');
+  });
+  it('returns invalid for empty input', () => {
+    const r = parsePhoneSmart('');
+    expect(r.valid).toBe(false);
+    if (!r.valid) expect(r.errorKey).toBe('invalid');
+  });
+  it('rejects garbage text', () => {
+    const r = parsePhoneSmart('hello world');
+    expect(r.valid).toBe(false);
   });
 });
 
@@ -100,8 +127,10 @@ describe('validateField', () => {
   it('email + valid returns null', () => {
     expect(validateField(field({ kind: 'email' }), 'ash@itqan.dev', 'en')).toBeNull();
   });
-  it('phone + invalid returns errPhone', () => {
-    expect(validateField(field({ kind: 'phone' }), '12345', 'ar')).toMatch(/رقم غير صالح/);
+  it('phone + invalid returns a phone-specific error', () => {
+    const result = validateField(field({ kind: 'phone' }), '12345', 'ar');
+    expect(result).not.toBeNull();
+    expect(result).toMatch(/رقم|الدولة/);
   });
   it('phone + valid E.164 returns null', () => {
     expect(validateField(field({ kind: 'phone' }), '+966551234567', 'ar')).toBeNull();

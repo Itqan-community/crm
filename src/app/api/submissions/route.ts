@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
-import { validateField } from '@/lib/validation';
+import { validateField, parsePhoneSmart } from '@/lib/validation';
 import { sendSlackNewSubmission } from '@/lib/notify/slack';
 import { sendSubmitterConfirmation } from '@/lib/notify/email';
 import { subscribeToNewsletter } from '@/lib/notify/newsletter';
@@ -103,19 +103,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'submission_insert_failed' }, { status: 500 });
   }
 
-  // Insert answers (skip empty)
+  // Insert answers (skip empty). Phone fields are re-parsed server-side so
+  // the stored value is always canonical E.164 regardless of how the client
+  // formatted it — guards against stale clients, curl submissions, and
+  // protects any downstream consumer from having to renormalise.
   const answerRows = fieldsTyped
     .map((f) => {
       const a = answerById.get(f.id);
       const v = a?.value ?? null;
       const isEmpty = v == null || v === '' || (Array.isArray(v) && v.length === 0);
       if (isEmpty) return null;
+      let valueText: string | null = typeof v === 'string' ? v : null;
+      if (f.kind === 'phone' && typeof v === 'string') {
+        const result = parsePhoneSmart(v);
+        if (result.valid) valueText = result.e164;
+      }
       return {
         submission_id: submissionRows.id,
         field_id: f.id,
         field_key_snap: f.key,
         field_label_snap: { ar: f.label_ar, en: f.label_en },
-        value_text: typeof v === 'string' ? v : null,
+        value_text: valueText,
         value_json: Array.isArray(v) ? v : null,
       };
     })
