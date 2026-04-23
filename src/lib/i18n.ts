@@ -7,10 +7,12 @@ export function pick(value: Bilingual | string | null | undefined, lang: Lang): 
 }
 
 export const UI = {
-  headerSubtitle:   { ar: 'نموذج التواصل',                 en: 'Contact form' },
+  headerSubtitle:   { ar: 'نموذج التواصل والمشاركة',        en: 'Contact form' },
   eyebrow:          { ar: 'نموذج التواصل · إتقان',          en: 'Contact form · Itqan' },
-  heroTitle:        { ar: 'أخبرنا كيف نخدمك',               en: 'Tell us how we can help' },
-  heroBody:         { ar: 'اختر ما يصفك من الخيارات التالية، وسنوجّهك إلى أسئلة مختصرة تناسب طلبك. لن يستغرق الأمر أكثر من دقيقتين — بإذن الله.',
+  heroTitle:        { ar: 'شاركنا في خدمة التقنيات القرآنية', en: 'Tell us how we can help' },
+  // Three Arabic paragraphs separated by \n\n; CategoryPicker splits and
+  // renders them as separate <p> elements. English stays a single paragraph.
+  heroBody:         { ar: 'نؤمن بأن الأثر الحقيقي يبدأ بالمشاركة، وإذا كنت شغوفاً بخدمة القرآن الكريم من خلال التقنية، فهذا هو مكانك.\n\nنرحّب بجميع المساهمين على اختلاف تخصصاتهم ومستوياتهم. اختر ما يصفك من الخيارات التالية، وسنوجّهك إلى أسئلة مختصرة تناسب اهتمامك — لن يستغرق الأمر أكثر من دقيقتين بإذن الله — ثم نتواصل معك بفرص واضحة للمساهمة في مشاريعنا أو الانضمام إلى فريق تنظيم المجتمع.\n\nمعاً، نجعل التقنيات القرآنية في متناول الجميع.',
                       en: 'Pick what describes you and we’ll walk you through a short set of questions. It won’t take more than two minutes.' },
   startCta:         { ar: 'ابدأ',                           en: 'Start' },
   requiredBadge:    { ar: 'مطلوب',                          en: 'Required' },
@@ -34,8 +36,8 @@ export const UI = {
   errPhone:         { ar: 'رقم غير صالح — استخدم الصيغة الدولية (مثال: +966551234567)',
                       en: 'Invalid number — use international format (e.g. +966551234567)' },
   errSubmit:        { ar: 'تعذّر إرسال طلبك. حاول مرة أخرى.', en: 'Could not submit. Please try again.' },
-  loading:          { ar: 'جاري التحميل…',                   en: 'Loading…' },
-  submitting:       { ar: 'جاري الإرسال…',                   en: 'Submitting…' },
+  loading:          { ar: 'جارٍ التحميل…',                   en: 'Loading…' },
+  submitting:       { ar: 'جارٍ الإرسال…',                   en: 'Submitting…' },
 } as const;
 
 export function stepOf(a: number, b: number, lang: Lang): string {

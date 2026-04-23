@@ -183,7 +183,7 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
             </div>
             <div className="leading-tight">
               <div className="text-[14px] font-semibold" style={{ color: 'var(--fg)' }}>
-                {lang === 'en' ? 'Itqan' : 'إتقان'}
+                {lang === 'en' ? 'Itqan' : 'مجتمع إتقان لتقنيات القرآن'}
               </div>
               <div className="text-[11px]" style={{ color: 'var(--muted)' }}>
                 {category ? pick({ ar: category.label_ar, en: category.label_en }, lang) : pick(UI.headerSubtitle, lang)}

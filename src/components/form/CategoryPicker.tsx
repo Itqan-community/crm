@@ -14,34 +14,40 @@ export function CategoryPicker({ categories, onPick, lang }: Props) {
   const textAlign = lang === 'en' ? 'text-left' : 'text-right';
   const Forward = lang === 'en' ? ArrowRight : ArrowLeft;
 
+  // Split body into paragraphs on blank lines so the Arabic 3-paragraph
+  // copy renders as separate <p> blocks while English (single string)
+  // still works without changes.
+  const bodyParagraphs = pick(UI.heroBody, lang).split(/\n\s*\n/).filter(Boolean);
+
   return (
     <div className="w-full max-w-3xl mx-auto">
       <div className="mb-10">
-        <div
-          className="text-[12.5px] tracking-[0.2em] mb-4 uppercase fade-up"
-          style={{ color: 'var(--accent-strong)', animationDelay: '0ms' }}
-        >
-          {pick(UI.eyebrow, lang)}
-        </div>
         <h1
-          className="text-[clamp(28px,4vw,44px)] font-semibold leading-[1.25] fade-up"
-          style={{ color: 'var(--fg)', animationDelay: '60ms' }}
+          className="text-[clamp(28px,4vw,44px)] leading-[1.25] fade-up"
+          style={{ color: 'var(--fg)', fontWeight: 800, animationDelay: '0ms' }}
         >
           {pick(UI.heroTitle, lang)}
         </h1>
-        <p
-          className="mt-4 text-[clamp(15px,1.6vw,17px)] leading-[1.9] max-w-[56ch] fade-up"
-          style={{ color: 'var(--muted)', animationDelay: '140ms' }}
-        >
-          {pick(UI.heroBody, lang)}
-        </p>
+        <div className="mt-4 max-w-[56ch] space-y-4">
+          {bodyParagraphs.map((para, i) => (
+            <p
+              key={i}
+              className="text-[clamp(15px,1.6vw,17px)] leading-[1.9] fade-up"
+              style={{ color: 'var(--muted)', animationDelay: `${80 + i * 80}ms` }}
+            >
+              {para}
+            </p>
+          ))}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
         {categories.map((c, i) => {
           const CatIcon = categoryIcon(c.icon);
-          // Stagger each card after the hero text settles.
-          const delay = 220 + i * 70;
+          // Cards start once the last hero paragraph has finished fading in,
+          // then stagger across themselves.
+          const cardBase = 80 + bodyParagraphs.length * 80 + 40;
+          const delay = cardBase + i * 70;
           return (
             <button
               key={c.id}

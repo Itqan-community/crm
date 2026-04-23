@@ -103,7 +103,7 @@ export function LoginForm({ next, initialError }: { next?: string; initialError?
           className="w-full px-5 py-3 rounded-lg text-[14.5px] font-semibold transition disabled:opacity-60"
           style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
         >
-          {pending ? 'جاري التحقق…' : 'تأكيد الدخول'}
+          {pending ? 'جارٍ التحقق…' : 'تأكيد الدخول'}
         </button>
         {error && <div className="text-[13.5px]" style={{ color: 'var(--danger)' }}>{error}</div>}
         <button
@@ -139,7 +139,7 @@ export function LoginForm({ next, initialError }: { next?: string; initialError?
         className="w-full px-5 py-3 rounded-lg text-[14.5px] font-semibold transition disabled:opacity-60"
         style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
       >
-        {pending ? 'جاري الإرسال…' : 'إرسال رمز الدخول'}
+        {pending ? 'جارٍ الإرسال…' : 'إرسال رمز الدخول'}
       </button>
       {error && <div className="text-[13.5px]" style={{ color: 'var(--danger)' }}>{error}</div>}
     </form>
