@@ -122,7 +122,7 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
     <div className="max-w-5xl">
       <div className="mb-2">
         <Link href="/admin" className="text-[13px] hover:underline" style={{ color: 'var(--muted)' }}>
-          ← الرجوع إلى الطلبات
+          → الرجوع إلى الطلبات
         </Link>
       </div>
       <div className="flex flex-wrap items-baseline justify-between gap-4 mb-6">

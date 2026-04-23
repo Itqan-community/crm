@@ -20,7 +20,7 @@ export default async function CategoryFieldsPage({ params }: { params: Promise<{
   return (
     <div className="max-w-4xl space-y-6">
       <div>
-        <Link href="/admin/settings/form-builder" className="text-[13px]" style={{ color: 'var(--muted)' }}>← العودة للفئات</Link>
+        <Link href="/admin/settings/form-builder" className="text-[13px]" style={{ color: 'var(--muted)' }}>→ العودة للفئات</Link>
         <h1 className="text-[22px] font-semibold mt-1">حقول فئة: {category.label_ar}</h1>
       </div>
       <FieldsAdmin categoryId={categoryId} fields={fields ?? []} />
