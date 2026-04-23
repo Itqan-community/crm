@@ -2,7 +2,7 @@
 
 import type { Lang } from '@/types/database';
 import { pick, UI, thanksBody } from '@/lib/i18n';
-import { Check } from './icons';
+import { Check, ArrowLeft, ArrowRight } from './icons';
 
 type Props = {
   refNo: string;
@@ -49,6 +49,28 @@ export function ThankYou({ refNo, onReset, lang }: Props) {
         </a>
       </div>
 
+      <div className="mt-10">
+        <div className="text-[12px] tracking-widest uppercase mb-3" style={{ color: 'var(--muted)' }}>
+          {pick(UI.exploreMore, lang)}
+        </div>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <ExploreLink
+            href="https://itqan.dev"
+            title={pick(UI.visitWebsite, lang)}
+            hint={pick(UI.visitWebsiteHint, lang)}
+            domain="itqan.dev"
+            lang={lang}
+          />
+          <ExploreLink
+            href="https://community.itqan.dev"
+            title={pick(UI.joinCommunity, lang)}
+            hint={pick(UI.joinCommunityHint, lang)}
+            domain="community.itqan.dev"
+            lang={lang}
+          />
+        </div>
+      </div>
+
       <div className="mt-8 flex items-center gap-3">
         <button
           onClick={onReset}
@@ -59,10 +81,58 @@ export function ThankYou({ refNo, onReset, lang }: Props) {
         >
           {pick(UI.sendAnother, lang)}
         </button>
-        <a href="https://itqan.dev" className="text-[14px]" style={{ color: 'var(--muted)' }}>
-          {pick(UI.backToSite, lang)}
-        </a>
       </div>
     </div>
+  );
+}
+
+function ExploreLink({
+  href,
+  title,
+  hint,
+  domain,
+  lang,
+}: {
+  href: string;
+  title: string;
+  hint: string;
+  domain: string;
+  lang: Lang;
+}) {
+  // Forward arrow points in the reading-flow direction: ← in RTL, → in LTR.
+  const Arrow = lang === 'ar' ? ArrowLeft : ArrowRight;
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group block rounded-xl p-4 border-2 transition-all"
+      style={{
+        background: 'var(--option-bg)',
+        borderColor: 'var(--option-border)',
+        color: 'var(--fg)',
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.borderColor = 'var(--accent)';
+        e.currentTarget.style.background = 'var(--option-bg-selected)';
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.borderColor = 'var(--option-border)';
+        e.currentTarget.style.background = 'var(--option-bg)';
+      }}
+    >
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <div className="text-[15px] font-semibold" style={{ color: 'var(--fg)' }}>
+          {title}
+        </div>
+        <Arrow size={16} className="opacity-60 group-hover:opacity-100 transition-opacity" />
+      </div>
+      <div className="text-[12.5px] leading-[1.7] mb-2" style={{ color: 'var(--muted)' }}>
+        {hint}
+      </div>
+      <div className="text-[12px] font-mono" style={{ color: 'var(--accent-strong)' }} dir="ltr">
+        {domain}
+      </div>
+    </a>
   );
 }
