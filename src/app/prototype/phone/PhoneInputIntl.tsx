@@ -21,9 +21,9 @@ type Props = {
 // the Arab bloc.
 const PRIORITY_ISO2: string[] = [
   // --- Arab League (22) ---
-  'sa', 'ae', 'qa', 'bh', 'kw', 'om', 'ye',
+  'sa', 'eg', 'ae', 'qa', 'bh', 'kw', 'om', 'ye',
   'jo', 'ps', 'lb', 'sy', 'iq',
-  'eg', 'sd', 'ly', 'tn', 'dz', 'ma',
+  'sd', 'ly', 'tn', 'dz', 'ma',
   'mr', 'dj', 'so', 'km',
   // --- Major Muslim-majority, non-Arab ---
   'id', 'pk', 'bd', 'ir', 'tr', 'af', 'my',
@@ -33,8 +33,8 @@ const PRIORITY_ISO2: string[] = [
   // --- Major world economies / destinations ---
   'us', 'gb', 'ca', 'au',
   'de', 'fr', 'it', 'es', 'nl', 'se', 'ch',
-  'ru', 'cn', 'jp', 'kr', 'in',
-  'br', 'mx', 'ar', 'za',
+  'ru', 'cn', 'jp', 'kr', 'in', 'za',
+  'br', 'mx', 'ar',
 ];
 const PRIORITY_INDEX = new Map(PRIORITY_ISO2.map((code, i) => [code, i]));
 
