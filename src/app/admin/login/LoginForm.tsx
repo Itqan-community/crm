@@ -120,7 +120,7 @@ export function LoginForm({ next, initialError }: { next?: string; initialError?
           className="text-[13px] hover:underline"
           style={{ color: 'var(--muted)' }}
         >
-          ← تغيير البريد
+          → تغيير البريد
         </button>
       </form>
     );
