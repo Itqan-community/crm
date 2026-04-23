@@ -35,10 +35,27 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'not_authorized' }, { status: 403 });
   }
 
+  // Pre-create a confirmed auth user. This lets us call signInWithOtp with
+  // shouldCreateUser:false, which sends ONLY the OTP email. With
+  // shouldCreateUser:true, Supabase also fires its default "Confirm Your
+  // Signup" template, so the user receives two emails. Duplicate errors
+  // (user already exists) are expected on repeat sign-ins and ignored.
+  const { error: createErr } = await admin.auth.admin.createUser({
+    email,
+    email_confirm: true,
+  });
+  if (createErr && !/already|exists|registered/i.test(createErr.message)) {
+    console.error('[request-otp] createUser failed', createErr);
+    return NextResponse.json(
+      { error: 'send_failed', detail: createErr.message },
+      { status: 500 },
+    );
+  }
+
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: true },
+    options: { shouldCreateUser: false },
   });
 
   if (error) {
