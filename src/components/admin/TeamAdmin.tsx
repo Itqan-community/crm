@@ -75,7 +75,7 @@ export function TeamAdmin({ team, allowed }: { team: TeamMemberRow[]; allowed: A
         <div className="mt-5 grid sm:grid-cols-[1.2fr_1.5fr_auto_auto] gap-2">
           <div>
             <Label>الاسم</Label>
-            <Input value={name} onChange={setName} placeholder="عبدالرحمن الشايع" />
+            <Input value={name} onChange={setName} placeholder="عبدالرحمن" />
           </div>
           <div>
             <Label>البريد</Label>
@@ -90,7 +90,7 @@ export function TeamAdmin({ team, allowed }: { team: TeamMemberRow[]; allowed: A
               style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}
             >
               <option value="member">عضو</option>
-              <option value="admin">أدمن</option>
+              <option value="admin">مدير</option>
             </select>
           </div>
           <div className="flex items-end">

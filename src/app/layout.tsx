@@ -4,7 +4,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 
 const SITE_URL = 'https://join.itqan.dev';
-const TITLE = 'مجتمع إتقان لتقنيات القرآن — شاركنا في خدمة التقنيات القرآنية';
+const TITLE = 'مجتمع إتقان - شاركنا في خدمة التقنيات القرآنية';
 const DESCRIPTION =
   'انضم إلى مجتمع إتقان: شاركنا في خدمة القرآن الكريم عبر التقنية. سواء كنت صاحب محتوى أو تطبيق، مطوّراً أو مصمماً أو إدارياً — اختر ما يصفك وسنوجّهك بفرص واضحة للمساهمة.';
 
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
     locale: 'ar_SA',
     alternateLocale: ['en_US'],
     url: SITE_URL,
-    siteName: 'مجتمع إتقان لتقنيات القرآن',
+    siteName: 'تواصل معنا | مجتمع إتقان لتقنيات القرآن',
     title: TITLE,
     description: DESCRIPTION,
     // The OG image is generated dynamically by opengraph-image.tsx in this
