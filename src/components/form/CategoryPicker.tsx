@@ -21,19 +21,24 @@ export function CategoryPicker({ categories, onPick, lang }: Props) {
 
   return (
     <div className="w-full max-w-3xl mx-auto">
-      <div className="mb-10">
+      <div className="mb-6 md:mb-10">
         <h1
-          className="text-[clamp(28px,4vw,44px)] leading-[1.25] fade-up"
+          className="text-[clamp(22px,4vw,44px)] leading-[1.25] fade-up"
           style={{ color: 'var(--fg)', fontWeight: 800, animationDelay: '0ms' }}
         >
           {pick(UI.heroTitle, lang)}
         </h1>
-        <div className="mt-4 max-w-[56ch] space-y-4">
+        <div className="mt-3 md:mt-4 max-w-[56ch] space-y-3 md:space-y-4">
           {bodyParagraphs.map((para, i) => (
             <p
               key={i}
-              className="text-[clamp(15px,1.6vw,17px)] leading-[1.9] fade-up"
-              style={{ color: 'var(--muted)', animationDelay: `${80 + i * 80}ms` }}
+              className="text-[clamp(13px,1.6vw,17px)] leading-[1.75] md:leading-[1.9] fade-up"
+              style={{
+                color: 'var(--muted)',
+                animationDelay: `${80 + i * 80}ms`,
+                textAlign: 'justify',
+                textJustify: 'inter-word',
+              }}
             >
               {para}
             </p>

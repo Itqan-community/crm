@@ -11,6 +11,15 @@ html, body {
   color: var(--fg);
 }
 
+/* Keep focused form inputs above iOS Safari's form-assist toolbar (the
+   up/down arrows + Done strip that sits on top of the keyboard). Without
+   this, the browser scrolls the input flush against the toolbar and the
+   user can't see what they're typing. The clamp leaves room for both the
+   toolbar and a breath of space on larger phones. */
+input, textarea {
+  scroll-margin-block-end: clamp(96px, 22vh, 180px);
+}
+
 /* ---- THEMES (4 visual variants — exact from design) ---- */
 :root[data-theme="olive"] {
   --bg: #FAF6F0;
