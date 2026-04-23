@@ -1,16 +1,126 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { PhoneInput } from 'react-international-phone';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  PhoneInput,
+  defaultCountries,
+  parseCountry,
+} from 'react-international-phone';
 import 'react-international-phone/style.css';
 import { parsePhoneNumberFromString, type CountryCode } from 'libphonenumber-js/min';
+import { normalizePhoneInput } from '@/lib/validation';
 
 type Props = {
   defaultCountry: CountryCode;
 };
 
+// Remove Israel from the country picker so Arabic users only see فلسطين (PS)
+// as the relevant regional option. Filtering at mount keeps the rest of the
+// library's country metadata (dial codes, formats, flags) intact.
+const COUNTRIES = defaultCountries.filter((c) => parseCountry(c).iso2 !== 'il');
+
 export function PhoneInputIntl({ defaultCountry }: Props) {
   const [value, setValue] = useState('');
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  // Keep the latest default country in a ref so the DOM listener below can
+  // read it without re-subscribing on every prop change.
+  const defaultCountryRef = useRef(defaultCountry);
+  useEffect(() => {
+    defaultCountryRef.current = defaultCountry;
+  }, [defaultCountry]);
+
+  // The library's internal AsYouType formatter only recognises ASCII digits
+  // and has no notion of national trunk prefixes. We intercept `beforeinput`
+  // on the native input to handle two cases the library misses:
+  //   • Arabic / Persian numerals (٠-٩, ۰-۹) get converted to ASCII.
+  //   • Pasted national numbers (e.g. "0551234567", "٠٥٥١٢٣٤٥٦٧") are routed
+  //     through libphonenumber-js with the resolved default country so the
+  //     user ends up with a proper E.164 value instead of a literal
+  //     "+0551234567".
+  useEffect(() => {
+    const input = wrapRef.current?.querySelector<HTMLInputElement>(
+      'input.react-international-phone-input',
+    );
+    if (!input) return;
+
+    const valueSetter = Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set;
+
+    const hasNonAsciiDigits = (s: string) => /[٠-٩۰-۹]/.test(s);
+    const digitsOnly = (s: string) => s.replace(/\D/g, '');
+
+    const insertNormalizedAtCursor = (normalizedChunk: string) => {
+      const start = input.selectionStart ?? input.value.length;
+      const end = input.selectionEnd ?? start;
+      const nextValue = input.value.slice(0, start) + normalizedChunk + input.value.slice(end);
+      valueSetter?.call(input, nextValue);
+      const cursor = start + normalizedChunk.length;
+      input.setSelectionRange(cursor, cursor);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    const replaceEntireValueWithE164 = (e164: string) => {
+      valueSetter?.call(input, e164);
+      input.setSelectionRange(e164.length, e164.length);
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
+    const handleBeforeInput = (e: Event) => {
+      const ev = e as InputEvent;
+      const data = ev.data;
+      if (!data) return;
+
+      const hasArabic = hasNonAsciiDigits(data);
+      const isPaste =
+        ev.inputType === 'insertFromPaste' || ev.inputType === 'insertFromDrop';
+      // A standalone chunk of digits (≥ 7) is treated as a "bulk" number even
+      // for plain typing — covers autofill and browser contact suggestions
+      // that land as `insertReplacementText`.
+      const looksLikeFullNumber = digitsOnly(data).length >= 7;
+
+      if (!hasArabic && !isPaste && !looksLikeFullNumber) return;
+
+      ev.preventDefault();
+      const normalized = normalizePhoneInput(data);
+
+      if (isPaste || looksLikeFullNumber) {
+        const parsed = parsePhoneNumberFromString(
+          normalized,
+          defaultCountryRef.current,
+        );
+        if (parsed?.number) {
+          replaceEntireValueWithE164(parsed.number);
+          return;
+        }
+      }
+
+      insertNormalizedAtCursor(normalized);
+    };
+
+    const handlePaste = (e: ClipboardEvent) => {
+      const text = e.clipboardData?.getData('text');
+      if (!text) return;
+      const normalized = normalizePhoneInput(text);
+      const parsed = parsePhoneNumberFromString(
+        normalized,
+        defaultCountryRef.current,
+      );
+      if (parsed?.number) {
+        e.preventDefault();
+        replaceEntireValueWithE164(parsed.number);
+      }
+    };
+
+    input.addEventListener('beforeinput', handleBeforeInput);
+    input.addEventListener('paste', handlePaste);
+    return () => {
+      input.removeEventListener('beforeinput', handleBeforeInput);
+      input.removeEventListener('paste', handlePaste);
+    };
+  }, []);
 
   const parsed = useMemo(() => {
     if (!value) return null;
@@ -25,11 +135,12 @@ export function PhoneInputIntl({ defaultCountry }: Props) {
 
   return (
     <div className="w-full space-y-4">
-      <div className="phone-intl-wrap">
+      <div className="phone-intl-wrap" ref={wrapRef}>
         <PhoneInput
           defaultCountry={defaultCountry.toLowerCase() as Lowercase<CountryCode>}
           value={value}
           onChange={setValue}
+          countries={COUNTRIES}
           inputProps={{ dir: 'ltr' }}
           className="phone-intl-input"
         />
