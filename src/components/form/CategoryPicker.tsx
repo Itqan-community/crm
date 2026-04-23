@@ -17,29 +17,41 @@ export function CategoryPicker({ categories, onPick, lang }: Props) {
   return (
     <div className="w-full max-w-3xl mx-auto">
       <div className="mb-10">
-        <div className="text-[12.5px] tracking-[0.2em] mb-4 uppercase" style={{ color: 'var(--accent-strong)' }}>
+        <div
+          className="text-[12.5px] tracking-[0.2em] mb-4 uppercase fade-up"
+          style={{ color: 'var(--accent-strong)', animationDelay: '0ms' }}
+        >
           {pick(UI.eyebrow, lang)}
         </div>
-        <h1 className="text-[clamp(28px,4vw,44px)] font-semibold leading-[1.25]" style={{ color: 'var(--fg)' }}>
+        <h1
+          className="text-[clamp(28px,4vw,44px)] font-semibold leading-[1.25] fade-up"
+          style={{ color: 'var(--fg)', animationDelay: '60ms' }}
+        >
           {pick(UI.heroTitle, lang)}
         </h1>
-        <p className="mt-4 text-[clamp(15px,1.6vw,17px)] leading-[1.9] max-w-[56ch]" style={{ color: 'var(--muted)' }}>
+        <p
+          className="mt-4 text-[clamp(15px,1.6vw,17px)] leading-[1.9] max-w-[56ch] fade-up"
+          style={{ color: 'var(--muted)', animationDelay: '140ms' }}
+        >
           {pick(UI.heroBody, lang)}
         </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2.5">
-        {categories.map((c) => {
+        {categories.map((c, i) => {
           const CatIcon = categoryIcon(c.icon);
+          // Stagger each card after the hero text settles.
+          const delay = 220 + i * 70;
           return (
             <button
               key={c.id}
               onClick={() => onPick(c.id)}
-              className={'group ' + textAlign + ' p-5 rounded-xl border-2 transition-all h-full flex flex-col'}
+              className={'group fade-up ' + textAlign + ' p-5 rounded-xl border-2 transition-all h-full flex flex-col'}
               style={{
                 background: 'var(--option-bg)',
                 borderColor: 'var(--option-border)',
                 color: 'var(--fg)',
+                animationDelay: `${delay}ms`,
               }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = 'var(--accent)';
