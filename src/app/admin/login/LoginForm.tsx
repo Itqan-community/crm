@@ -2,7 +2,6 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
-import { createSupabaseBrowserClient } from '@/lib/supabase/client';
 
 type Step = 'email' | 'code' | 'success';
 
@@ -11,6 +10,8 @@ const ERROR_MESSAGES: Record<string, string> = {
   invalid_token:    'الرمز يجب أن يتكون من ٦ أرقام.',
   verify_failed:    'الرمز غير صحيح أو انتهت صلاحيته. اطلب رمزاً جديداً.',
   not_authorized:   'هذا البريد غير مصرّح له بدخول اللوحة. تواصل مع الأدمن لإضافته.',
+  rate_limited:     'تم تجاوز الحد المسموح من الرسائل. حاول بعد قليل.',
+  send_failed:      'تعذّر إرسال الرمز. حاول مرة أخرى.',
   network:          'تعذّر الاتصال. تحقّق من الإنترنت وحاول مرة أخرى.',
 };
 
@@ -26,13 +27,20 @@ export function LoginForm({ next, initialError }: { next?: string; initialError?
     e.preventDefault();
     setError(null);
     startTransition(async () => {
-      const supabase = createSupabaseBrowserClient();
-      const { error: err } = await supabase.auth.signInWithOtp({
-        email: email.trim().toLowerCase(),
-        options: { shouldCreateUser: true },
-      });
-      if (err) {
-        setError(err.message);
+      let res: Response;
+      try {
+        res = await fetch('/api/auth/request-otp', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ email: email.trim().toLowerCase() }),
+        });
+      } catch {
+        setError(translateError('network'));
+        return;
+      }
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        setError(translateError(body.error || 'send_failed'));
         return;
       }
       setStep('code');
