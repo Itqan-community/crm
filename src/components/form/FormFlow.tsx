@@ -5,6 +5,7 @@ import type { FormCategoryRow, FormFieldRow, Lang } from '@/types/database';
 import { pick, UI, stepOf } from '@/lib/i18n';
 import { validateField } from '@/lib/validation';
 import { resolveDefaultCountry } from '@/lib/phone-detect';
+import { buildStepPlan } from '@/lib/step-plan';
 import { ProgressBar } from './ProgressBar';
 import { LangToggle } from './LangToggle';
 import { CategoryPicker } from './CategoryPicker';
@@ -30,6 +31,7 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
   const [refNo, setRefNo] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
 
   // Initialize lang from URL or localStorage; sync to <html>.
   useEffect(() => {
@@ -52,11 +54,33 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
     document.title = lang === 'en' ? 'Itqan — Contact' : 'إتقان — نموذج التواصل';
   }, [lang]);
 
+  // Track how much the on-screen keyboard (iOS) is eating off the layout
+  // viewport so the sticky bottom nav can hover just above the keyboard
+  // instead of being hidden underneath it. visualViewport also fires when
+  // Safari's form-assist toolbar shows, which is exactly the overlap the
+  // user hit on iPhone.
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      setKeyboardOffset(offset);
+    };
+    onResize();
+    vv.addEventListener('resize', onResize);
+    vv.addEventListener('scroll', onResize);
+    return () => {
+      vv.removeEventListener('resize', onResize);
+      vv.removeEventListener('scroll', onResize);
+    };
+  }, []);
+
   const fields = categoryId ? schema.fieldsByCategory[categoryId] || [] : [];
-  const totalSteps = fields.length;
+  const stepPlan = useMemo(() => buildStepPlan(fields), [fields]);
+  const totalSteps = stepPlan.length;
   const atFormStart = categoryId == null && !done;
   const atField = !atFormStart && !done;
-  const currentField = atField ? fields[stepIndex] : null;
+  const currentStep = atField ? stepPlan[stepIndex] : null;
   const category = categoryId ? schema.categories.find((c) => c.id === categoryId) || null : null;
 
   const progressPct = useMemo(() => {
@@ -82,15 +106,25 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
   };
 
   const goNext = async () => {
-    if (!currentField) return;
-    const err = validateField(currentField, values[currentField.id], lang);
-    if (err) {
-      setErrors((prev) => ({ ...prev, [currentField.id]: err }));
+    if (!currentStep || currentStep.length === 0) return;
+    // Validate every field in the current step before advancing. Collect
+    // errors together so the user sees all the problems at once, not one
+    // pop at a time.
+    const stepErrors: Record<string, string | null> = {};
+    let hasError = false;
+    for (const f of currentStep) {
+      const err = validateField(f, values[f.id], lang);
+      if (err) {
+        stepErrors[f.id] = err;
+        hasError = true;
+      }
+    }
+    if (hasError) {
+      setErrors((prev) => ({ ...prev, ...stepErrors }));
       return;
     }
     setDirection(1);
     if (stepIndex + 1 >= totalSteps) {
-      // Submit
       await submit();
     } else {
       setStepIndex(stepIndex + 1);
@@ -215,16 +249,22 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
         <ProgressBar value={progressPct} />
       </div>
 
-      <main className="flex-1 flex items-center justify-center px-6 md:px-10 py-10 md:py-16 overflow-hidden">
+      <main
+        className="flex-1 flex items-start md:items-center justify-center px-6 md:px-10 py-8 md:py-16 overflow-hidden"
+        style={{
+          // Extra bottom padding when the keyboard is open so the focused
+          // input never lands flush with Safari's form-assist bar.
+          paddingBottom: keyboardOffset > 0 ? keyboardOffset + 24 : undefined,
+        }}
+      >
         <div className="w-full max-w-3xl">
           {atFormStart && <CategoryPicker categories={schema.categories} onPick={pickCategory} lang={lang} />}
-          {atField && currentField && (
+          {atField && currentStep && (
             <StepCard
-              field={currentField}
-              value={values[currentField.id]}
-              onChange={(v) => setVal(currentField.id, v)}
-              error={errors[currentField.id]}
-              autoFocus
+              step={currentStep}
+              values={values}
+              errors={errors}
+              onFieldChange={setVal}
               direction={direction}
               lang={lang}
               category={category}
@@ -240,7 +280,18 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
       </main>
 
       {atField && (
-        <div className="sticky bottom-0 z-20 border-t" style={{ background: 'var(--bg)', borderColor: 'var(--rule-soft)' }}>
+        <div
+          className="sticky z-20 border-t transition-transform"
+          style={{
+            background: 'var(--bg)',
+            borderColor: 'var(--rule-soft)',
+            // When the iOS keyboard is open, pin the nav just above it
+            // instead of leaving it pinned to the (hidden) bottom of the
+            // layout viewport. On desktop and keyboard-closed the offset
+            // is 0 and this behaves like a normal sticky bottom.
+            bottom: keyboardOffset,
+          }}
+        >
           <div className="max-w-3xl mx-auto px-6 md:px-10 py-4 flex items-center justify-between gap-4">
             <button
               onClick={goBack}

@@ -2,8 +2,10 @@
 
 import { useState, useTransition } from 'react';
 import type { FormFieldRow, Bilingual } from '@/types/database';
-import { upsertField, deleteField } from '@/lib/admin-actions';
+import { upsertField, deleteField, setFieldActive } from '@/lib/admin-actions';
 import { DialogActions, DialogField, DialogInput } from '../DialogPrimitives';
+
+type DeleteOutcome = { action: 'deleted' | 'disabled'; label: string };
 
 const KINDS: { value: FormFieldRow['kind']; label: string }[] = [
   { value: 'text', label: 'نص قصير' },
@@ -28,6 +30,16 @@ export function FieldsAdmin({ categoryId, fields }: { categoryId: string; fields
   const [editing, setEditing] = useState<Partial<FormFieldRow> | null>(null);
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
+
+  const announceDelete = (outcome: DeleteOutcome) => {
+    setInfo(
+      outcome.action === 'deleted'
+        ? `تم حذف الحقل "${outcome.label}" نهائياً.`
+        : `الحقل "${outcome.label}" مُستخدم في طلبات سابقة — تم تعطيله بدل حذفه، ولن يظهر للمستخدمين الجدد.`,
+    );
+    window.setTimeout(() => setInfo(null), 6000);
+  };
 
   return (
     <section className="rounded-xl border p-5" style={{ borderColor: 'var(--rule)' }}>
@@ -59,36 +71,87 @@ export function FieldsAdmin({ categoryId, fields }: { categoryId: string; fields
       </div>
       <ul className="divide-y" style={{ borderColor: 'var(--rule-soft)' }}>
         {fields.map((f) => (
-          <li key={f.id} className="py-3 flex items-center justify-between gap-2">
+          <li
+            key={f.id}
+            className="py-3 flex items-center justify-between gap-2 transition-opacity"
+            style={{ opacity: f.is_active ? 1 : 0.55 }}
+          >
             <div>
-              <div className="font-medium text-[14px]">{f.label_ar}</div>
+              <div className="font-medium text-[14px] flex items-center gap-2">
+                <span style={{ textDecoration: f.is_active ? undefined : 'line-through' }}>
+                  {f.label_ar}
+                </span>
+                {!f.is_active && (
+                  <span
+                    className="text-[10.5px] font-semibold px-1.5 py-0.5 rounded"
+                    style={{ background: 'var(--rule-soft)', color: 'var(--muted)' }}
+                  >
+                    معطّل
+                  </span>
+                )}
+              </div>
               <div className="text-[12.5px]" style={{ color: 'var(--muted)' }}>
                 <span className="font-mono">{f.key}</span> · {KINDS.find((k) => k.value === f.kind)?.label}
                 {f.is_required && ' · مطلوب'}
-                {!f.is_active && ' · معطّل'}
                 {f.semantic_role && ` · دور: ${f.semantic_role}`}
               </div>
             </div>
             <div className="flex items-center gap-1">
               <button onClick={() => setEditing(f)} className="text-[12.5px] px-2 py-1 rounded hover:bg-[var(--option-bg-selected)]">تعديل</button>
-              <button
-                onClick={() => {
-                  if (!confirm(`حذف الحقل "${f.label_ar}"؟ (إن استُخدم في طلبات سابقة سيُعطّل بدلاً من حذفه)`)) return;
-                  setError(null);
-                  startTransition(async () => {
-                    try { await deleteField(f.id, categoryId); } catch (e: any) { setError(e?.message ?? 'فشل الحذف'); }
-                  });
-                }}
-                className="text-[12.5px] px-2 py-1 rounded hover:bg-[var(--option-bg-selected)]"
-                style={{ color: 'var(--danger)' }}
-              >
-                حذف/تعطيل
-              </button>
+              {f.is_active ? (
+                <button
+                  onClick={() => {
+                    if (!confirm(`حذف الحقل "${f.label_ar}"؟ (إن استُخدم في طلبات سابقة سيُعطّل بدلاً من حذفه)`)) return;
+                    setError(null);
+                    setInfo(null);
+                    startTransition(async () => {
+                      try {
+                        const result = await deleteField(f.id, categoryId);
+                        announceDelete({ action: result.action, label: f.label_ar });
+                      } catch (e: any) {
+                        setError(e?.message ?? 'فشل الحذف');
+                      }
+                    });
+                  }}
+                  className="text-[12.5px] px-2 py-1 rounded hover:bg-[var(--option-bg-selected)]"
+                  style={{ color: 'var(--danger)' }}
+                >
+                  حذف/تعطيل
+                </button>
+              ) : (
+                <button
+                  onClick={() => {
+                    setError(null);
+                    setInfo(null);
+                    startTransition(async () => {
+                      try {
+                        await setFieldActive(f.id, categoryId, true);
+                        setInfo(`تم إعادة تفعيل الحقل "${f.label_ar}".`);
+                        window.setTimeout(() => setInfo(null), 4000);
+                      } catch (e: any) {
+                        setError(e?.message ?? 'فشل التفعيل');
+                      }
+                    });
+                  }}
+                  className="text-[12.5px] px-2 py-1 rounded hover:bg-[var(--option-bg-selected)]"
+                  style={{ color: 'var(--accent)' }}
+                >
+                  تفعيل
+                </button>
+              )}
             </div>
           </li>
         ))}
       </ul>
       {error && <div className="mt-3 text-[13px]" style={{ color: 'var(--danger)' }}>{error}</div>}
+      {info && !error && (
+        <div
+          className="mt-3 text-[13px] rounded-lg px-3 py-2 border"
+          style={{ color: 'var(--fg)', background: 'var(--rule-soft)', borderColor: 'var(--rule)' }}
+        >
+          {info}
+        </div>
+      )}
 
       {editing && (
         <FieldEditDialog

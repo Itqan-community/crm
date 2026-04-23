@@ -79,6 +79,12 @@ export const viewport: Viewport = {
   ],
   width: 'device-width',
   initialScale: 1,
+  // Tell Chrome/Edge to shrink the layout viewport when the soft keyboard
+  // opens so our sticky bottom nav lands above the keyboard instead of
+  // hiding behind it. Safari ignores this key and relies on the
+  // visualViewport listener in FormFlow instead; both cooperate without
+  // conflict.
+  interactiveWidget: 'resizes-content',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
