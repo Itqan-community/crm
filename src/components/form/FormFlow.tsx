@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { FormCategoryRow, FormFieldRow, Lang } from '@/types/database';
 import { pick, UI, stepOf } from '@/lib/i18n';
 import { validateField } from '@/lib/validation';
+import { resolveDefaultCountry } from '@/lib/phone-detect';
 import { ProgressBar } from './ProgressBar';
 import { LangToggle } from './LangToggle';
 import { CategoryPicker } from './CategoryPicker';
@@ -63,6 +64,17 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
     if (atFormStart) return 2;
     return Math.round(((stepIndex + 1) / (totalSteps + 1)) * 100);
   }, [done, atFormStart, stepIndex, totalSteps]);
+
+  // The phone input uses this to pre-select the correct country when the
+  // user reaches that step. Resolution order: an answered location field
+  // (free-text, parsed for country keywords) → the UI language → SA as a
+  // final fallback.
+  const phoneDefaultCountry = useMemo(() => {
+    const locationField = fields.find((f) => f.semantic_role === 'location');
+    const raw = locationField ? values[locationField.id] : undefined;
+    const locationText = typeof raw === 'string' ? raw : null;
+    return resolveDefaultCountry({ location: locationText, lang });
+  }, [fields, values, lang]);
 
   const setVal = (id: string, v: FieldValue) => {
     setValues((prev) => ({ ...prev, [id]: v }));
@@ -220,6 +232,7 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
                 setDirection(-1);
                 setCategoryId(null);
               }}
+              phoneDefaultCountry={phoneDefaultCountry}
             />
           )}
           {done && refNo && <ThankYou refNo={refNo} onReset={reset} lang={lang} />}

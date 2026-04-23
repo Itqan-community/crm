@@ -17,9 +17,11 @@
     "@supabase/supabase-js": "^2.45.4",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
+    "libphonenumber-js": "^1.12.42",
     "next": "^15.0.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-international-phone": "^4.8.0",
     "resend": "^4.0.0"
   },
   "devDependencies": {

@@ -1,5 +1,6 @@
 'use client';
 
+import type { CountryCode } from 'libphonenumber-js/min';
 import type { FormFieldRow, Lang } from '@/types/database';
 import { TextInput } from './TextInput';
 import { TextArea } from './TextArea';
@@ -16,9 +17,10 @@ type Props = {
   error?: string | null;
   autoFocus?: boolean;
   lang: Lang;
+  phoneDefaultCountry?: CountryCode;
 };
 
-export function FieldRenderer({ field, value, onChange, error, autoFocus, lang }: Props) {
+export function FieldRenderer({ field, value, onChange, error, autoFocus, lang, phoneDefaultCountry }: Props) {
   switch (field.kind) {
     case 'text':
       return (
@@ -64,6 +66,7 @@ export function FieldRenderer({ field, value, onChange, error, autoFocus, lang }
           error={error}
           autoFocus={autoFocus}
           lang={lang}
+          defaultCountry={phoneDefaultCountry}
         />
       );
     case 'textarea':
