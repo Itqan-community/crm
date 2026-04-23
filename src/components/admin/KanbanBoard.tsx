@@ -18,6 +18,7 @@ import {
 import type { StatusRow } from '@/types/database';
 import type { SubmissionListRow } from '@/lib/admin-queries';
 import { setSubmissionStatus } from '@/lib/admin-actions';
+import { LocalTime } from './LocalTime';
 
 type Props = {
   submissions: SubmissionListRow[];
@@ -188,7 +189,7 @@ function CardView({ row, statusColor, dragging = false }: { row: SubmissionListR
           {row.assignee && (
             <Avatar name={row.assignee.full_name || row.assignee.email} />
           )}
-          <span>{new Date(row.created_at).toLocaleDateString('ar-EG-u-nu-latn', { month: 'short', day: 'numeric' })}</span>
+          <LocalTime iso={row.created_at} mode="date" />
         </div>
       </div>
     </Link>

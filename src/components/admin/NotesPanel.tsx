@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { addNote, deleteNote } from '@/lib/admin-actions';
+import { LocalTime } from './LocalTime';
 
 type Note = {
   id: string;
@@ -66,7 +67,7 @@ export function NotesPanel({ submissionId, notes, currentUserId }: Props) {
             <div className="flex items-center justify-between mb-1">
               <div className="text-[12.5px] font-medium">{n.author?.full_name || n.author?.email || '—'}</div>
               <div className="flex items-center gap-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>
-                <span>{new Date(n.created_at).toLocaleString('ar')}</span>
+                <LocalTime iso={n.created_at} />
                 {n.author_id === currentUserId && (
                   <button
                     onClick={() => startTransition(() => deleteNote(n.id, submissionId))}

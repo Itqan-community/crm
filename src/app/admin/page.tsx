@@ -3,6 +3,7 @@ import { FilterBar } from '@/components/admin/FilterBar';
 import { StatusBadge } from '@/components/admin/StatusBadge';
 import { ViewToggle, type AdminView } from '@/components/admin/ViewToggle';
 import { KanbanBoard } from '@/components/admin/KanbanBoard';
+import { LocalTime } from '@/components/admin/LocalTime';
 import {
   loadSubmissions,
   loadStatuses,
@@ -96,9 +97,7 @@ function SubmissionsTable({ rows }: { rows: Awaited<ReturnType<typeof loadSubmis
                 )}
               </Td>
               <Td>
-                <span title={new Date(r.created_at).toLocaleString('ar')}>
-                  {new Date(r.created_at).toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'short', day: 'numeric' })}
-                </span>
+                <LocalTime iso={r.created_at} mode="date" />
               </Td>
             </tr>
           ))}

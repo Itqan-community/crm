@@ -1,3 +1,5 @@
+import { LocalTime } from './LocalTime';
+
 type Activity = {
   id: string;
   action: string;
@@ -48,7 +50,7 @@ export function ActivityFeed({
               <div className="text-[12px]" style={{ color: 'var(--muted)' }}>
                 {describeMeta(a.action, a.meta, statusesById, teamById)}
                 {' · '}
-                {new Date(a.created_at).toLocaleString('ar')}
+                <LocalTime iso={a.created_at} />
               </div>
             </div>
           </li>
@@ -64,15 +66,18 @@ function describeMeta(
   statusesById: Record<string, { label_ar: string }>,
   teamById: Record<string, { label: string }>,
 ): string {
+  // RTL note: in Arabic the visual flow goes right-to-left, so the "from →
+  // to" arrow has to point left ("←") to read as forward progress. Using
+  // "→" here would visually appear to point backwards.
   if (action === 'status_changed') {
     const from = String(meta.from || '');
     const to = String(meta.to || '');
-    return `${statusesById[from]?.label_ar || '—'} → ${statusesById[to]?.label_ar || '—'}`;
+    return `${statusesById[from]?.label_ar || '—'} ← ${statusesById[to]?.label_ar || '—'}`;
   }
   if (action === 'assigned') {
     const from = meta.from ? teamById[String(meta.from)]?.label || '—' : 'بلا';
     const to = meta.to ? teamById[String(meta.to)]?.label || '—' : 'بلا';
-    return `${from} → ${to}`;
+    return `${from} ← ${to}`;
   }
   if (action === 'created' && meta.reference_no) {
     return `الرقم المرجعي: ${meta.reference_no}`;

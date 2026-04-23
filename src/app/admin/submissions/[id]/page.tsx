@@ -6,6 +6,7 @@ import { StatusEditor } from '@/components/admin/StatusEditor';
 import { AssigneePicker } from '@/components/admin/AssigneePicker';
 import { NotesPanel } from '@/components/admin/NotesPanel';
 import { ActivityFeed } from '@/components/admin/ActivityFeed';
+import { LocalTime } from '@/components/admin/LocalTime';
 import type { Bilingual } from '@/types/database';
 
 export const dynamic = 'force-dynamic';
@@ -132,7 +133,7 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
             {' · '}
             {sub.category?.label_ar}
             {' · '}
-            {new Date(sub.created_at).toLocaleString('ar')}
+            <LocalTime iso={sub.created_at} />
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
