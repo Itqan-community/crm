@@ -2,9 +2,9 @@ import { defaultCountries, parseCountry } from 'react-international-phone';
 
 // Country picker ordering — Arab countries first, then major
 // Muslim-majority countries, then global economies, then the rest
-// alphabetically (the library's default order for anything not listed).
-// Israel ('il') is excluded entirely; Palestine ('ps') is included with
-// the Arab bloc.
+// alphabetically. The entry keyed 'il' is renamed to
+// "Palestinian Territories" and left in the alphabetical tail;
+// Palestine ('ps') stays in the Arab bloc with the +970 dial code.
 const PRIORITY_ISO2: string[] = [
   // --- Arab League (22) ---
   'sa', 'eg', 'ae', 'qa', 'bh', 'kw', 'om', 'ye',
@@ -29,17 +29,32 @@ export const PHONE_COUNTRIES = (() => {
   const rest: typeof defaultCountries = [];
   for (const entry of defaultCountries) {
     const { iso2 } = parseCountry(entry);
-    if (iso2 === 'il') continue;
+
+    // Rename the 'il' entry to "Palestinian Territories" but keep its
+    // dial code / format intact, then push it into `rest` so it sorts
+    // alphabetically with the unpriorised countries.
+    const effectiveEntry: typeof entry =
+      iso2 === 'il'
+        ? (['Palestinian Territories', ...entry.slice(1)] as typeof entry)
+        : entry;
+
     if (PRIORITY_INDEX.has(iso2)) {
-      priority.push(entry);
+      priority.push(effectiveEntry);
     } else {
-      rest.push(entry);
+      rest.push(effectiveEntry);
     }
   }
   priority.sort(
     (a, b) =>
       (PRIORITY_INDEX.get(parseCountry(a).iso2) ?? 0) -
       (PRIORITY_INDEX.get(parseCountry(b).iso2) ?? 0),
+  );
+  // Re-sort `rest` by display name: the library ships the list
+  // alphabetically by the original name, so after renaming 'il' from
+  // "Israel" to "Palestinian Territories" we need to move it from the
+  // I-block down to the P-block.
+  rest.sort((a, b) =>
+    parseCountry(a).name.localeCompare(parseCountry(b).name),
   );
   return [...priority, ...rest];
 })();
