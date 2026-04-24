@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { PhoneInput as IntlPhoneInput } from 'react-international-phone';
 import 'react-international-phone/style.css';
 import {
@@ -9,7 +9,7 @@ import {
 } from 'libphonenumber-js/min';
 import type { FormFieldRow, Lang } from '@/types/database';
 import { normalizePhoneInput } from '@/lib/validation';
-import { PHONE_COUNTRIES } from '@/lib/phone-countries';
+import { getPhoneCountries } from '@/lib/phone-countries';
 import { ErrorNote } from './ErrorNote';
 
 type Props = {
@@ -22,13 +22,27 @@ type Props = {
   defaultCountry?: CountryCode;
 };
 
+// Twemoji codepoints 1F1F5 1F1F8 = 🇵🇸. Uses the same CDN + version the
+// react-international-phone library uses for its built-in flags, so the
+// visual style matches every other country in the dropdown.
+const CUSTOM_FLAGS = [
+  {
+    iso2: 'il' as const,
+    src: 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f5-1f1f8.svg',
+  },
+];
+
 export function PhoneInput({
   value,
   onChange,
   error,
   autoFocus,
+  lang,
   defaultCountry = 'SA',
 }: Props) {
+  // Country names in the dropdown are localised via i18n-iso-countries;
+  // recompute when the UI language flips.
+  const countries = useMemo(() => getPhoneCountries(lang), [lang]);
   const wrapRef = useRef<HTMLDivElement>(null);
 
   // Keep the latest default country in a ref so the DOM listener below can
@@ -137,7 +151,13 @@ export function PhoneInput({
           defaultCountry={defaultCountry.toLowerCase() as Lowercase<CountryCode>}
           value={value || ''}
           onChange={onChange}
-          countries={PHONE_COUNTRIES}
+          countries={countries}
+          // The 'il' entry is renamed to "Palestinian Territories" /
+          // "الأراضي الفلسطينية"; keeping the Israeli flag next to that
+          // label is incoherent, so swap in the Palestinian flag
+          // (twemoji codepoints 1F1F5 1F1F8) on the same CDN the library
+          // uses for every other country so the style stays consistent.
+          flags={CUSTOM_FLAGS}
           inputProps={{ dir: 'ltr', autoComplete: 'tel', name: 'phone' }}
         />
       </div>
