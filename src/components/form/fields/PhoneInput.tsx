@@ -22,6 +22,16 @@ type Props = {
   defaultCountry?: CountryCode;
 };
 
+// Twemoji codepoints 1F1F5 1F1F8 = 🇵🇸. Uses the same CDN + version the
+// react-international-phone library uses for its built-in flags, so the
+// visual style matches every other country in the dropdown.
+const CUSTOM_FLAGS = [
+  {
+    iso2: 'il' as const,
+    src: 'https://cdnjs.cloudflare.com/ajax/libs/twemoji/14.0.2/svg/1f1f5-1f1f8.svg',
+  },
+];
+
 export function PhoneInput({
   value,
   onChange,
@@ -142,6 +152,12 @@ export function PhoneInput({
           value={value || ''}
           onChange={onChange}
           countries={countries}
+          // The 'il' entry is renamed to "Palestinian Territories" /
+          // "الأراضي الفلسطينية"; keeping the Israeli flag next to that
+          // label is incoherent, so swap in the Palestinian flag
+          // (twemoji codepoints 1F1F5 1F1F8) on the same CDN the library
+          // uses for every other country so the style stays consistent.
+          flags={CUSTOM_FLAGS}
           inputProps={{ dir: 'ltr', autoComplete: 'tel', name: 'phone' }}
         />
       </div>
