@@ -17,6 +17,7 @@
     "@supabase/supabase-js": "^2.45.4",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
+    "i18n-iso-countries": "^7.14.0",
     "libphonenumber-js": "^1.12.42",
     "next": "^15.0.3",
     "react": "^18.3.1",
