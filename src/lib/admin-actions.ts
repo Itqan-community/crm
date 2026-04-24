@@ -238,19 +238,37 @@ export async function upsertField(input: {
   revalidatePath(`/admin/settings/form-builder/${input.category_id}`);
 }
 
-export async function deleteField(fieldId: string, categoryId: string) {
+export async function deleteField(
+  fieldId: string,
+  categoryId: string,
+): Promise<{ action: 'deleted' | 'disabled'; answerCount: number }> {
   const { supabase } = await requireAdmin();
-  // Soft-delete if any answers reference it; otherwise hard-delete.
+  // Soft-delete if any answers reference it; otherwise hard-delete. The
+  // return value tells the caller which branch ran so the admin UI can
+  // explain what actually happened to the field.
   const { count } = await supabase
     .from('submission_answers')
     .select('id', { count: 'exact', head: true })
     .eq('field_id', fieldId);
-  if ((count ?? 0) > 0) {
+  const answerCount = count ?? 0;
+  if (answerCount > 0) {
     const { error } = await supabase.from('form_fields').update({ is_active: false }).eq('id', fieldId);
     if (error) throw new Error(error.message);
-  } else {
-    const { error } = await supabase.from('form_fields').delete().eq('id', fieldId);
-    if (error) throw new Error(error.message);
+    revalidatePath(`/admin/settings/form-builder/${categoryId}`);
+    return { action: 'disabled', answerCount };
   }
+  const { error } = await supabase.from('form_fields').delete().eq('id', fieldId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/settings/form-builder/${categoryId}`);
+  return { action: 'deleted', answerCount };
+}
+
+export async function setFieldActive(fieldId: string, categoryId: string, isActive: boolean) {
+  const { supabase } = await requireAdmin();
+  const { error } = await supabase
+    .from('form_fields')
+    .update({ is_active: isActive })
+    .eq('id', fieldId);
+  if (error) throw new Error(error.message);
   revalidatePath(`/admin/settings/form-builder/${categoryId}`);
 }
