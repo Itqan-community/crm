@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
 import { validateField, parsePhoneSmart } from '@/lib/validation';
 import { sendSlackNewSubmission } from '@/lib/notify/slack';
@@ -157,41 +157,52 @@ export async function POST(req: Request) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || new URL(req.url).origin;
   const submissionUrl = `${siteUrl}/admin/submissions/${submissionRows.id}`;
 
-  // Fire-and-forget notifications. If any fail, log to activity_log so the team sees it.
-  const [slackOk, emailOk, newsletterOk] = await Promise.all([
-    sendSlackNewSubmission({
-      referenceNo: submissionRows.reference_no,
-      categoryLabel,
-      submitterName: String(nameVal),
-      submitterEmail: String(emailVal),
-      submissionUrl,
-    }),
-    sendSubmitterConfirmation({
-      to: String(emailVal),
-      name: String(nameVal),
-      referenceNo: submissionRows.reference_no,
-      lang,
-    }),
-    newsletterOptin
-      ? subscribeToNewsletter({ name: String(nameVal), email: String(emailVal) })
-      : Promise.resolve(true),
-  ]);
+  // Run notifications after the response has been sent. We used to await
+  // Promise.all(slack, email, newsletter) before returning, which made
+  // every submit pay for the slowest external network — Slack timeouts of
+  // 5–10s on a flaky mobile connection were felt directly by the user as
+  // a stuck "Submitting…" button. Vercel's `after()` keeps the function
+  // alive long enough to finish these without blocking the response.
+  after(async () => {
+    try {
+      const [slackOk, emailOk, newsletterOk] = await Promise.all([
+        sendSlackNewSubmission({
+          referenceNo: submissionRows.reference_no,
+          categoryLabel,
+          submitterName: String(nameVal),
+          submitterEmail: String(emailVal),
+          submissionUrl,
+        }),
+        sendSubmitterConfirmation({
+          to: String(emailVal),
+          name: String(nameVal),
+          referenceNo: submissionRows.reference_no,
+          lang,
+        }),
+        newsletterOptin
+          ? subscribeToNewsletter({ name: String(nameVal), email: String(emailVal) })
+          : Promise.resolve(true),
+      ]);
 
-  const logs: { action: string; meta?: Record<string, unknown> }[] = [];
-  if (process.env.SLACK_WEBHOOK_URL && !slackOk) logs.push({ action: 'slack_failed' });
-  if (process.env.RESEND_API_KEY && !emailOk) logs.push({ action: 'email_failed' });
-  if (newsletterOptin) {
-    logs.push(newsletterOk ? { action: 'newsletter_subscribed' } : { action: 'newsletter_failed' });
-  }
-  if (logs.length > 0) {
-    await supabase.from('activity_log').insert(
-      logs.map((l) => ({
-        submission_id: submissionRows.id,
-        action: l.action,
-        meta: l.meta || {},
-      })),
-    );
-  }
+      const logs: { action: string; meta?: Record<string, unknown> }[] = [];
+      if (process.env.SLACK_WEBHOOK_URL && !slackOk) logs.push({ action: 'slack_failed' });
+      if (process.env.RESEND_API_KEY && !emailOk) logs.push({ action: 'email_failed' });
+      if (newsletterOptin) {
+        logs.push(newsletterOk ? { action: 'newsletter_subscribed' } : { action: 'newsletter_failed' });
+      }
+      if (logs.length > 0) {
+        await supabase.from('activity_log').insert(
+          logs.map((l) => ({
+            submission_id: submissionRows.id,
+            action: l.action,
+            meta: l.meta || {},
+          })),
+        );
+      }
+    } catch (e) {
+      console.error('[api/submissions] post-response notification error', e);
+    }
+  });
 
   return NextResponse.json({
     id: submissionRows.id,

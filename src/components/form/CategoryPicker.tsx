@@ -57,20 +57,16 @@ export function CategoryPicker({ categories, onPick, lang }: Props) {
             <button
               key={c.id}
               onClick={() => onPick(c.id)}
-              className={'group fade-up ' + textAlign + ' p-5 rounded-xl border-2 transition-all h-full flex flex-col'}
+              // category-card opts into the CSS hover/active feedback
+              // defined in globals.css. The previous inline
+              // onMouseEnter/onMouseLeave handlers never fired on touch
+              // devices and could leave hover state stuck after a tap.
+              className={'category-card group fade-up ' + textAlign + ' p-5 rounded-xl border-2 transition-all h-full flex flex-col'}
               style={{
                 background: 'var(--option-bg)',
                 borderColor: 'var(--option-border)',
                 color: 'var(--fg)',
                 animationDelay: `${delay}ms`,
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--accent)';
-                e.currentTarget.style.background = 'var(--option-bg-selected)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--option-border)';
-                e.currentTarget.style.background = 'var(--option-bg)';
               }}
             >
               <div
