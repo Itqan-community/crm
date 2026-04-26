@@ -17,6 +17,7 @@ export type SubmissionFilters = {
   category?: string;
   status?: string;
   assignee?: string; // 'unassigned' | uuid | undefined
+  include_archived?: string; // '1' to bypass the default archived-hidden filter
 };
 
 export async function loadSubmissions(filters: SubmissionFilters): Promise<SubmissionListRow[]> {
@@ -35,6 +36,15 @@ export async function loadSubmissions(filters: SubmissionFilters): Promise<Submi
 
   if (filters.category) q = q.eq('category_id', filters.category);
   if (filters.status) q = q.eq('status_id', filters.status);
+  else if (filters.include_archived !== '1') {
+    // Hide archived by default; an explicit status filter or include_archived=1 overrides this.
+    const { data: archived } = await supabase
+      .from('statuses')
+      .select('id')
+      .eq('key', 'archived')
+      .maybeSingle();
+    if (archived) q = q.neq('status_id', archived.id);
+  }
   if (filters.assignee === 'unassigned') q = q.is('assignee_id', null);
   else if (filters.assignee) q = q.eq('assignee_id', filters.assignee);
 

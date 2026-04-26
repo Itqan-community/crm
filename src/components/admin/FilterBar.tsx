@@ -44,6 +44,17 @@ export function FilterBar({ categories, statuses, team }: Props) {
                 { value: 'unassigned', label: 'بدون مسؤول' },
                 ...team.map((t) => ({ value: t.id, label: t.full_name || t.email })),
               ]} />
+      <label
+        className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-[13.5px] cursor-pointer select-none"
+        style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}
+      >
+        <input
+          type="checkbox"
+          checked={sp.get('include_archived') === '1'}
+          onChange={(e) => update('include_archived', e.target.checked ? '1' : '')}
+        />
+        إظهار المؤرشفة
+      </label>
       <a
         href={exportHref}
         className="ms-auto px-3 py-2 rounded-lg border text-[13px] hover:bg-[var(--option-bg-selected)] transition"
