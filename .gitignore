@@ -39,3 +39,6 @@ _design_assets/
 
 # local Claude Code state
 .claude/
+
+# Sentry CLI
+.sentryclirc
