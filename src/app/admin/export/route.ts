@@ -15,6 +15,7 @@ export async function GET(req: NextRequest) {
     category: sp.get('category') ?? undefined,
     status: sp.get('status') ?? undefined,
     assignee: sp.get('assignee') ?? undefined,
+    include_archived: sp.get('include_archived') ?? undefined,
   });
 
   // Pull all answers for selected submissions in one query.

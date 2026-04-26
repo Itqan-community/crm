@@ -36,6 +36,24 @@ export async function setSubmissionStatus(submissionId: string, statusId: string
   revalidatePath('/admin');
 }
 
+export async function archiveSubmissions(submissionIds: string[]) {
+  if (submissionIds.length === 0) return;
+  const { supabase } = await requireTeam();
+  const { data: archivedStatus, error: statusErr } = await supabase
+    .from('statuses')
+    .select('id')
+    .eq('key', 'archived')
+    .maybeSingle();
+  if (statusErr) throw new Error(statusErr.message);
+  if (!archivedStatus) throw new Error('archived_status_missing');
+  const { error } = await supabase
+    .from('submissions')
+    .update({ status_id: archivedStatus.id })
+    .in('id', submissionIds);
+  if (error) throw new Error(error.message);
+  revalidatePath('/admin');
+}
+
 export async function setSubmissionAssignee(submissionId: string, assigneeId: string | null) {
   const { supabase } = await requireTeam();
   const { error } = await supabase
