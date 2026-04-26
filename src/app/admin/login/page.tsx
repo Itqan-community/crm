@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import { LoginForm } from './LoginForm';
 
 export const dynamic = 'force-dynamic';
@@ -12,9 +13,15 @@ async function LoginPageInner({ sp }: { sp: Promise<{ next?: string; error?: str
     <div className="min-h-screen flex items-center justify-center px-6" style={{ background: 'var(--bg)' }}>
       <div className="w-full max-w-md">
         <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-lg overflow-hidden" style={{ boxShadow: '0 0 0 1px var(--rule)' }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/itqan_logo_square.png" alt="Itqan" className="w-full h-full object-cover" />
+          <div className="w-10 h-10 rounded-lg overflow-hidden relative" style={{ boxShadow: '0 0 0 1px var(--rule)' }}>
+            <Image
+              src="/itqan_logo_square.png"
+              alt="Itqan"
+              width={40}
+              height={40}
+              priority
+              className="w-full h-full object-cover"
+            />
           </div>
           <div>
             <div className="text-[15px] font-semibold" style={{ color: 'var(--fg)' }}>إتقان</div>

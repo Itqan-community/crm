@@ -20,6 +20,8 @@ export function TextArea({ field, value, onChange, error, autoFocus, lang }: Pro
     if (autoFocus) ref.current?.focus();
   }, [autoFocus]);
 
+  const errorId = error ? `${field.id}-err` : undefined;
+
   return (
     <div className="w-full">
       <textarea
@@ -29,6 +31,8 @@ export function TextArea({ field, value, onChange, error, autoFocus, lang }: Pro
         placeholder={pick({ ar: field.placeholder_ar ?? '', en: field.placeholder_en ?? '' }, lang)}
         onChange={(e) => onChange(e.target.value)}
         dir={lang === 'en' ? 'ltr' : 'rtl'}
+        aria-invalid={error ? true : undefined}
+        aria-describedby={errorId}
         className="w-full bg-transparent outline-none text-[clamp(17px,2vw,20px)] leading-[1.85] pb-3 border-b-2 resize-none transition-colors"
         style={{
           color: 'var(--fg)',
@@ -38,7 +42,7 @@ export function TextArea({ field, value, onChange, error, autoFocus, lang }: Pro
         onFocus={(e) => (e.target.style.borderColor = error ? 'var(--danger)' : 'var(--accent)')}
         onBlur={(e) => (e.target.style.borderColor = error ? 'var(--danger)' : 'var(--rule)')}
       />
-      <ErrorNote>{error}</ErrorNote>
+      <ErrorNote id={errorId}>{error}</ErrorNote>
     </div>
   );
 }

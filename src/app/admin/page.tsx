@@ -56,8 +56,12 @@ export default async function AdminHome({
 
 function SubmissionsTable({ rows }: { rows: Awaited<ReturnType<typeof loadSubmissions>> }) {
   return (
-    <div className="border rounded-xl overflow-hidden" style={{ borderColor: 'var(--rule)' }}>
-      <table className="w-full text-[13.5px]">
+    // overflow-x-auto lets the 6-column table scroll horizontally on narrow
+    // screens instead of being silently clipped by overflow-hidden. The
+    // inner table gets a min-width so each column keeps its natural size
+    // even when the visible area is much smaller.
+    <div className="border rounded-xl overflow-x-auto" style={{ borderColor: 'var(--rule)' }}>
+      <table className="w-full min-w-[720px] text-[13.5px]">
         <thead style={{ background: 'var(--option-bg-selected)' }}>
           <tr style={{ color: 'var(--muted)' }}>
             <Th>الرقم المرجعي</Th>

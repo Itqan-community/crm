@@ -6,7 +6,11 @@
 
 html, body {
   -webkit-font-smoothing: antialiased;
-  font-family: var(--font-body, 'Rubik'), system-ui, sans-serif;
+  /* Theme tokens (--font-body / --font-display) point at one of the
+     next/font variables defined on <html>: --font-rubik,
+     --font-ibm-plex-arabic, --font-scheherazade. Falls back to the named
+     family + system-ui so a missing variable never leaves text unstyled. */
+  font-family: var(--font-body, var(--font-rubik)), system-ui, sans-serif;
   background: var(--bg);
   color: var(--fg);
 }
@@ -35,8 +39,8 @@ input, textarea {
   --option-border: rgba(27,67,50,0.12);
   --option-border-hover: rgba(27,67,50,0.3);
   --danger: #B0493A;
-  --font-body: 'Rubik';
-  --font-display: 'Rubik';
+  --font-body: var(--font-rubik);
+  --font-display: var(--font-rubik);
 }
 :root[data-theme="paper"] {
   --bg: #F7F4EE;
@@ -52,8 +56,8 @@ input, textarea {
   --option-border: rgba(0,0,0,0.12);
   --option-border-hover: rgba(0,0,0,0.28);
   --danger: #9A3D2F;
-  --font-body: 'IBM Plex Sans Arabic';
-  --font-display: 'IBM Plex Sans Arabic';
+  --font-body: var(--font-ibm-plex-arabic);
+  --font-display: var(--font-ibm-plex-arabic);
 }
 :root[data-theme="gold"] {
   --bg: #FBF7EF;
@@ -69,8 +73,8 @@ input, textarea {
   --option-border: rgba(176,137,104,0.25);
   --option-border-hover: rgba(176,137,104,0.5);
   --danger: #A0452C;
-  --font-body: 'Rubik';
-  --font-display: 'Rubik';
+  --font-body: var(--font-rubik);
+  --font-display: var(--font-rubik);
 }
 :root[data-theme="deep"] {
   --bg: #122A20;
@@ -86,8 +90,8 @@ input, textarea {
   --option-border: rgba(241,233,216,0.18);
   --option-border-hover: rgba(212,180,131,0.5);
   --danger: #E89B86;
-  --font-body: 'Rubik';
-  --font-display: 'Scheherazade New';
+  --font-body: var(--font-rubik);
+  --font-display: var(--font-scheherazade);
 }
 
 /* Slide animations */
@@ -129,3 +133,64 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
   outline-offset: 3px;
   border-radius: 6px;
 }
+
+/* ---- Safe-area utilities ----
+   Pair with `viewport-fit=cover` in layout.tsx so the sticky bottom nav
+   doesn't end up sitting under the iPhone home indicator and headers
+   don't disappear behind the Dynamic Island in landscape. We mix the
+   inset with our existing padding so the visual rhythm matches before
+   and after the inset kicks in. */
+.safe-bottom { padding-bottom: env(safe-area-inset-bottom); }
+.safe-top    { padding-top:    env(safe-area-inset-top); }
+
+/* ---- Touch feedback ----
+   Inline onMouseEnter/onMouseLeave handlers don't fire reliably on touch
+   devices and can leave hover state stuck after a tap. CSS :active gives
+   instant, deterministic feedback the moment the user presses, then
+   releases cleanly when the finger lifts. We scope to actual interactive
+   elements so we don't touch text-only links (e.g. mailto:). */
+@media (hover: none) {
+  /* Hover-driven background swaps don't survive on touch devices —
+     surface a press feedback instead. Limited to interactive roles so we
+     don't dim links that already have their own background swap (e.g.
+     ExploreLink uses `class="group"` and gets a border + bg shift on
+     :active via .explore-link below; layering brightness() on top of
+     that read as a flicker). */
+  button:active:not(:disabled),
+  a[role="button"]:active {
+    filter: brightness(0.93);
+  }
+}
+/* Pointer-aware press: still helps trackpad users on desktop. */
+button:active:not(:disabled) {
+  transform: translateY(0.5px);
+}
+
+/* ---- Hover/active styles formerly handled by inline JS ---- */
+
+/* Public form: category card (CategoryPicker.tsx). Old code used inline
+   onMouseEnter/onMouseLeave to swap border + background — hover-only and
+   stuck-on-touch. */
+.category-card:hover {
+  border-color: var(--accent);
+  background: var(--option-bg-selected);
+}
+
+/* Public form: radio/checkbox row (OptionRow.tsx). Hovered items get a
+   slightly stronger border, but the *selected* row keeps the accent
+   border so we don't override it with the hover colour. */
+.option-row:hover:not([data-selected]) {
+  border-color: var(--option-border-hover);
+}
+
+/* ThankYou screen: "send another" + explore links. */
+.reset-cta:hover { border-color: var(--accent); }
+.explore-link:hover {
+  border-color: var(--accent);
+  background: var(--option-bg-selected);
+}
+
+/* Form sticky-nav buttons (FormFlow.tsx). Back button text darkens on
+   hover; Next button uses :active brightness via the global rule above. */
+.form-nav-back:hover:not(:disabled) { color: var(--fg); }
+.form-nav-next:hover:not(:disabled) { filter: brightness(0.95); }

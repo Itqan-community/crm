@@ -74,10 +74,8 @@ export function ThankYou({ refNo, onReset, lang }: Props) {
       <div className="mt-8 flex items-center gap-3">
         <button
           onClick={onReset}
-          className="inline-flex items-center gap-2 px-5 py-3 rounded-lg border-2 text-[14.5px] font-medium transition"
+          className="reset-cta inline-flex items-center gap-2 px-5 py-3 rounded-lg border-2 text-[14.5px] font-medium transition"
           style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}
-          onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'var(--accent)')}
-          onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'var(--rule)')}
         >
           {pick(UI.sendAnother, lang)}
         </button>
@@ -106,19 +104,11 @@ function ExploreLink({
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="group block rounded-xl p-4 border-2 transition-all"
+      className="explore-link group block rounded-xl p-4 border-2 transition-all"
       style={{
         background: 'var(--option-bg)',
         borderColor: 'var(--option-border)',
         color: 'var(--fg)',
-      }}
-      onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = 'var(--accent)';
-        e.currentTarget.style.background = 'var(--option-bg-selected)';
-      }}
-      onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = 'var(--option-border)';
-        e.currentTarget.style.background = 'var(--option-bg)';
       }}
     >
       <div className="flex items-center justify-between gap-3 mb-1">

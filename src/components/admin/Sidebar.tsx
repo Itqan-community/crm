@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -55,9 +56,15 @@ export function Sidebar({ role }: { role: 'admin' | 'member' }) {
         className="p-4 flex items-center gap-3 hover:bg-[var(--option-bg-selected)] transition"
         title="الذهاب للوحة الرئيسية"
       >
-        <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0" style={{ boxShadow: '0 0 0 1px var(--rule)' }}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/itqan_logo_square.png" alt="Itqan" className="w-full h-full object-cover" />
+        <div className="w-9 h-9 rounded-lg overflow-hidden shrink-0 relative" style={{ boxShadow: '0 0 0 1px var(--rule)' }}>
+          <Image
+            src="/itqan_logo_square.png"
+            alt="Itqan"
+            width={36}
+            height={36}
+            priority
+            className="w-full h-full object-cover"
+          />
         </div>
         {!isCollapsed && (
           <div className="leading-tight min-w-0">

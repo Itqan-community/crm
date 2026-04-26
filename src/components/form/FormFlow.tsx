@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
 import type { FormCategoryRow, FormFieldRow, Lang } from '@/types/database';
 import { pick, UI, stepOf } from '@/lib/i18n';
 import { validateField } from '@/lib/validation';
@@ -221,11 +222,17 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
         <div className="max-w-5xl mx-auto px-6 md:px-10 pt-5 pb-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-lg overflow-hidden"
+              className="w-10 h-10 rounded-lg overflow-hidden relative"
               style={{ boxShadow: '0 0 0 1px var(--rule)' }}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/itqan_logo_square.png" alt="Itqan" className="w-full h-full object-cover" />
+              <Image
+                src="/itqan_logo_square.png"
+                alt={lang === 'en' ? 'Itqan' : 'مجتمع إتقان'}
+                width={40}
+                height={40}
+                priority
+                className="w-full h-full object-cover"
+              />
             </div>
             <div className="leading-tight">
               <div className="text-[14px] font-semibold" style={{ color: 'var(--fg)' }}>
@@ -246,7 +253,7 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
             <LangToggle lang={lang} onChange={setLang} />
           </div>
         </div>
-        <ProgressBar value={progressPct} />
+        <ProgressBar value={progressPct} lang={lang} />
       </div>
 
       <main
@@ -281,7 +288,7 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
 
       {atField && (
         <div
-          className="sticky z-20 border-t transition-transform"
+          className="sticky z-20 border-t transition-transform safe-bottom"
           style={{
             background: 'var(--bg)',
             borderColor: 'var(--rule-soft)',
@@ -292,37 +299,50 @@ export function FormFlow({ schema }: { schema: FormSchema }) {
             bottom: keyboardOffset,
           }}
         >
+          {/* Submit error banner — visible on every viewport. Previously this
+              lived inside a `hidden md:flex` row and was completely invisible
+              on mobile, turning a failed submission into a silent failure. */}
+          {submitError && (
+            <div
+              role="alert"
+              className="max-w-3xl mx-auto px-6 md:px-10 pt-3 -mb-1 text-[13px] text-center"
+              style={{ color: 'var(--danger)' }}
+            >
+              {submitError}
+            </div>
+          )}
           <div className="max-w-3xl mx-auto px-6 md:px-10 py-4 flex items-center justify-between gap-4">
             <button
               onClick={goBack}
               disabled={submitting}
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-[14px] transition disabled:opacity-50"
+              className="form-nav-back inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-[14px] transition disabled:opacity-50"
               style={{ color: 'var(--muted)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--fg)')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--muted)')}
             >
               <Back size={16} />
               {pick(UI.back, lang)}
             </button>
 
-            <div className="hidden md:flex items-center gap-2 text-[12px]" style={{ color: 'var(--muted)' }}>
-              {submitError ? (
-                <span style={{ color: 'var(--danger)' }}>{submitError}</span>
-              ) : (
-                <>
+            {/* Step counter (mobile-visible, compact form) + desktop "Press
+                Enter" hint. Previously the entire status text was
+                `hidden sm:block`, leaving mobile users without any sense of
+                progress beyond the 3px ProgressBar. */}
+            <div className="flex items-center gap-3 text-[12px]" style={{ color: 'var(--muted)' }}>
+              <span className="sm:hidden tabular-nums" aria-hidden="true">
+                {stepIndex + 1}/{totalSteps}
+              </span>
+              {!submitError && (
+                <span className="hidden md:inline-flex items-center gap-2">
                   <Enter size={14} />
-                  <span>{pick(UI.pressEnter, lang)}</span>
-                </>
+                  {pick(UI.pressEnter, lang)}
+                </span>
               )}
             </div>
 
             <button
               onClick={() => void goNext()}
               disabled={submitting}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-lg text-[14.5px] font-semibold transition disabled:opacity-60"
+              className="form-nav-next inline-flex items-center gap-2 px-6 py-3 rounded-lg text-[14.5px] font-semibold transition disabled:opacity-60"
               style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
-              onMouseEnter={(e) => (e.currentTarget.style.filter = 'brightness(0.95)')}
-              onMouseLeave={(e) => (e.currentTarget.style.filter = 'none')}
             >
               {submitting
                 ? pick(UI.submitting, lang)

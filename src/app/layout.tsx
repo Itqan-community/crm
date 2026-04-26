@@ -1,7 +1,33 @@
 import type { Metadata, Viewport } from 'next';
+import { Rubik, IBM_Plex_Sans_Arabic, Scheherazade_New } from 'next/font/google';
 import { Analytics } from '@vercel/analytics/next';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
+
+// Self-host the three fonts referenced by our theme tokens so we drop the
+// render-blocking <link> to fonts.googleapis.com and pick up Next.js's
+// font-display optimisation (no FOUT) automatically. The CSS variables
+// below are consumed by globals.css via var(--font-rubik) etc.
+const rubik = Rubik({
+  subsets: ['latin', 'arabic'],
+  weight: ['300', '400', '500', '600', '700'],
+  variable: '--font-rubik',
+  display: 'swap',
+});
+
+const ibmPlex = IBM_Plex_Sans_Arabic({
+  subsets: ['arabic'],
+  weight: ['300', '400', '500', '600'],
+  variable: '--font-ibm-plex-arabic',
+  display: 'swap',
+});
+
+const scheherazade = Scheherazade_New({
+  subsets: ['arabic'],
+  weight: ['400', '600', '700'],
+  variable: '--font-scheherazade',
+  display: 'swap',
+});
 
 const SITE_URL = 'https://join.itqan.dev';
 const TITLE = 'مجتمع إتقان - شاركنا في خدمة التقنيات القرآنية';
@@ -79,6 +105,12 @@ export const viewport: Viewport = {
   ],
   width: 'device-width',
   initialScale: 1,
+  // viewport-fit=cover lets the page render under the iPhone notch /
+  // Dynamic Island and the home-indicator strip; we then opt back into
+  // safe areas explicitly via env(safe-area-inset-*) on the sticky bottom
+  // nav (see .safe-bottom in globals.css). Without cover, iOS auto-pads
+  // the layout and our sticky nav still lands behind the home indicator.
+  viewportFit: 'cover',
   // Tell Chrome/Edge to shrink the layout viewport when the soft keyboard
   // opens so our sticky bottom nav lands above the keyboard instead of
   // hiding behind it. Safari ignores this key and relies on the
@@ -89,15 +121,12 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ar" dir="rtl" data-theme="olive">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Rubik:wght@300;400;500;600;700&family=Scheherazade+New:wght@400;600;700&family=IBM+Plex+Sans+Arabic:wght@300;400;500;600&display=swap"
-          rel="stylesheet"
-        />
-      </head>
+    <html
+      lang="ar"
+      dir="rtl"
+      data-theme="olive"
+      className={`${rubik.variable} ${ibmPlex.variable} ${scheherazade.variable}`}
+    >
       <body>
         {children}
         <Analytics />

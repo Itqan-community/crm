@@ -17,17 +17,15 @@ export function OptionRow({ label, letter, selected, onClick, kind, lang }: Prop
     <button
       type="button"
       onClick={onClick}
-      className={'group w-full ' + textAlign + ' px-5 py-4 rounded-xl border-2 transition-all flex items-center gap-4'}
+      // option-row picks up the CSS-only hover/active feedback in
+      // globals.css. The previous JS handlers swapped border colour but
+      // never fired on touch — taps got no acknowledgement.
+      data-selected={selected || undefined}
+      className={'option-row group w-full ' + textAlign + ' px-5 py-4 rounded-xl border-2 transition-all flex items-center gap-4'}
       style={{
         background: selected ? 'var(--option-bg-selected)' : 'var(--option-bg)',
         borderColor: selected ? 'var(--accent)' : 'var(--option-border)',
         color: 'var(--fg)',
-      }}
-      onMouseEnter={(e) => {
-        if (!selected) e.currentTarget.style.borderColor = 'var(--option-border-hover)';
-      }}
-      onMouseLeave={(e) => {
-        if (!selected) e.currentTarget.style.borderColor = 'var(--option-border)';
       }}
     >
       <span
