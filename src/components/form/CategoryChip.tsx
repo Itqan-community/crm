@@ -13,7 +13,7 @@ type Props = {
 export function CategoryChip({ category, onChange, lang }: Props) {
   const CatIcon = categoryIcon(category.icon);
   return (
-    <div className="mb-8 flex items-center gap-2.5 flex-wrap">
+    <div className="mb-8 hidden sm:flex items-center gap-2.5 flex-wrap">
       <span
         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-[13px] font-medium"
         style={{ borderColor: 'var(--rule)', background: 'var(--option-bg-selected)', color: 'var(--accent-strong)' }}
