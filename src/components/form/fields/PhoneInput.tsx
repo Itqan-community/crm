@@ -33,6 +33,7 @@ const CUSTOM_FLAGS = [
 ];
 
 export function PhoneInput({
+  field,
   value,
   onChange,
   error,
@@ -144,6 +145,8 @@ export function PhoneInput({
     };
   }, [autoFocus]);
 
+  const errorId = error ? `${field.id}-err` : undefined;
+
   return (
     <div className="w-full">
       <div className="phone-intl-wrap" ref={wrapRef}>
@@ -158,10 +161,17 @@ export function PhoneInput({
           // (twemoji codepoints 1F1F5 1F1F8) on the same CDN the library
           // uses for every other country so the style stays consistent.
           flags={CUSTOM_FLAGS}
-          inputProps={{ dir: 'ltr', autoComplete: 'tel', name: 'phone' }}
+          inputProps={{
+            dir: 'ltr',
+            autoComplete: 'tel',
+            name: 'phone',
+            inputMode: 'tel',
+            'aria-invalid': error ? true : undefined,
+            'aria-describedby': errorId,
+          }}
         />
       </div>
-      <ErrorNote>{error}</ErrorNote>
+      <ErrorNote id={errorId}>{error}</ErrorNote>
 
       <style jsx global>{`
         .phone-intl-wrap .react-international-phone-input-container {
@@ -185,6 +195,11 @@ export function PhoneInput({
         }
         .phone-intl-wrap .react-international-phone-country-selector-dropdown__list-item {
           color: var(--fg);
+          /* The library default is ~28px tall — well below the 44px touch
+             target floor recommended by WCAG / iOS HIG. Bump to 44 so
+             tapping a country on a phone is reliable. */
+          min-height: 44px;
+          padding: 8px 12px;
         }
         .phone-intl-wrap .react-international-phone-country-selector-dropdown__list-item:hover,
         .phone-intl-wrap .react-international-phone-country-selector-dropdown__list-item--focused {
