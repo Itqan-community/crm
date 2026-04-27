@@ -41,16 +41,19 @@ export async function sendSubmitterConfirmation(p: ConfirmationPayload): Promise
 }
 
 function renderAr(name: string, ref: string): string {
-  return `<!DOCTYPE html><html lang="ar" dir="rtl"><body style="font-family: Tahoma, Arial, sans-serif; background:#FAF6F0; margin:0; padding:32px;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; margin:0 auto; background:#fff; border:1px solid rgba(27,67,50,0.12); border-radius:14px; overflow:hidden;">
-      <tr><td style="padding:28px;">
+  // direction:rtl + text-align:right are repeated inline because Gmail and
+  // Outlook strip the <html dir="rtl"> attribute when they wrap the body in
+  // their own container, leaving Arabic punctuation in the wrong visual slot.
+  return `<!DOCTYPE html><html lang="ar" dir="rtl"><body style="font-family: Tahoma, Arial, sans-serif; background:#FAF6F0; margin:0; padding:32px; direction:rtl; text-align:right;">
+    <table role="presentation" dir="rtl" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px; margin:0 auto; background:#fff; border:1px solid rgba(27,67,50,0.12); border-radius:14px; overflow:hidden;">
+      <tr><td style="padding:28px; direction:rtl; text-align:right;">
         <h1 style="margin:0 0 12px; font-size:22px; color:#1F2A24;">مرحباً ${escapeHtml(name)}،</h1>
         <p style="margin:0 0 16px; font-size:15px; line-height:1.85; color:#1F2A24;">
           وصلتنا رسالتك بحمد الله. سيراجعها فريق إتقان ويعود إليك خلال ٣ أيام عمل بإذن الله.
         </p>
         <div style="margin:18px 0; padding:14px 18px; border:1px solid rgba(27,67,50,0.12); border-radius:10px; background:#F1EFE7;">
-          <div style="font-size:11px; letter-spacing:0.15em; text-transform:uppercase; color:#6B6B68; margin-bottom:4px;">الرقم المرجعي</div>
-          <div style="font-size:17px; font-weight:600; color:#1B4332; font-family:monospace;">${escapeHtml(ref)}</div>
+          <div style="font-size:12px; color:#6B6B68; margin-bottom:4px;">الرقم المرجعي</div>
+          <div style="font-size:17px; font-weight:600; color:#1B4332; font-family:monospace; direction:ltr; unicode-bidi:isolate;">${escapeHtml(ref)}</div>
         </div>
         <p style="margin:0; font-size:13.5px; color:#6B6B68;">إن احتجت للتواصل قبل ذلك، راسلنا على
           <a href="mailto:connect@itqan.dev" style="color:#1B4332;">connect@itqan.dev</a> مع ذكر الرقم المرجعي.</p>
