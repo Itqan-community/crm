@@ -1,10 +1,11 @@
 'use client';
 
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import type { SubmissionListRow } from '@/lib/admin-queries';
 import { archiveSubmissions } from '@/lib/admin-actions';
 import { StatusBadge } from './StatusBadge';
+import { CategoryBadge } from './CategoryBadge';
 import { LocalTime } from './LocalTime';
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
 };
 
 export function SubmissionsTable({ rows }: Props) {
+  const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [pending, startTransition] = useTransition();
 
@@ -77,7 +79,7 @@ export function SubmissionsTable({ rows }: Props) {
       )}
 
       <div className="border rounded-xl overflow-x-auto" style={{ borderColor: 'var(--rule)' }}>
-        <table className="w-full min-w-[760px] text-[13.5px]">
+        <table className="w-full min-w-[900px] text-[13.5px]">
           <thead style={{ background: 'var(--option-bg-selected)' }}>
             <tr style={{ color: 'var(--muted)' }}>
               <th className="px-4 py-3 w-10">
@@ -93,6 +95,7 @@ export function SubmissionsTable({ rows }: Props) {
               </th>
               <Th>الرقم المرجعي</Th>
               <Th>الاسم</Th>
+              <Th>البريد</Th>
               <Th>الفئة</Th>
               <Th>الحالة</Th>
               <Th>المسؤول</Th>
@@ -102,7 +105,7 @@ export function SubmissionsTable({ rows }: Props) {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center" style={{ color: 'var(--muted)' }}>
+                <td colSpan={8} className="px-4 py-12 text-center" style={{ color: 'var(--muted)' }}>
                   لا توجد طلبات تطابق هذه الفلاتر.
                 </td>
               </tr>
@@ -112,11 +115,12 @@ export function SubmissionsTable({ rows }: Props) {
               return (
                 <tr
                   key={r.id}
-                  className="border-t hover:bg-[var(--option-bg-selected)] transition"
+                  className="border-t hover:bg-[var(--option-bg-selected)] transition cursor-pointer"
                   style={{ borderColor: 'var(--rule-soft)' }}
                   data-selected={isChecked || undefined}
+                  onClick={() => router.push(`/admin/submissions/${r.id}`)}
                 >
-                  <Td>
+                  <Td onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={isChecked}
@@ -125,21 +129,28 @@ export function SubmissionsTable({ rows }: Props) {
                     />
                   </Td>
                   <Td>
-                    <Link
-                      href={`/admin/submissions/${r.id}`}
+                    <span
                       className="font-mono text-[12.5px]"
                       style={{ color: 'var(--accent-strong)' }}
                     >
                       {r.reference_no}
-                    </Link>
+                    </span>
                   </Td>
                   <Td>
-                    <div className="font-medium">{r.submitter_name}</div>
-                    <div className="text-[12px]" style={{ color: 'var(--muted)' }} dir="ltr">
-                      {r.submitter_email}
-                    </div>
+                    <span className="font-medium">{r.submitter_name}</span>
                   </Td>
-                  <Td>{r.category?.label_ar || '—'}</Td>
+                  <Td>
+                    <span className="text-[12.5px]" style={{ color: 'var(--muted)' }} dir="ltr">
+                      {r.submitter_email}
+                    </span>
+                  </Td>
+                  <Td>
+                    {r.category ? (
+                      <CategoryBadge label={r.category.label_ar} categoryKey={r.category.key} />
+                    ) : (
+                      '—'
+                    )}
+                  </Td>
                   <Td>
                     {r.status ? <StatusBadge label={r.status.label_ar} color={r.status.color} /> : '—'}
                   </Td>
@@ -166,6 +177,16 @@ export function SubmissionsTable({ rows }: Props) {
 function Th({ children }: { children: React.ReactNode }) {
   return <th className="px-4 py-3 text-start font-medium text-[12px] uppercase tracking-wider">{children}</th>;
 }
-function Td({ children }: { children: React.ReactNode }) {
-  return <td className="px-4 py-3 align-middle">{children}</td>;
+function Td({
+  children,
+  onClick,
+}: {
+  children: React.ReactNode;
+  onClick?: (e: React.MouseEvent<HTMLTableCellElement>) => void;
+}) {
+  return (
+    <td className="px-4 py-3 align-middle" onClick={onClick}>
+      {children}
+    </td>
+  );
 }

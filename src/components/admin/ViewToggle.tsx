@@ -10,7 +10,7 @@ export function ViewToggle({ current }: { current: AdminView }) {
 
   const change = (view: AdminView) => {
     const next = new URLSearchParams(sp.toString());
-    if (view === 'table') next.delete('view');
+    if (view === 'kanban') next.delete('view');
     else next.set('view', view);
     router.push('/admin' + (next.toString() ? '?' + next.toString() : ''));
   };

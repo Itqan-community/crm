@@ -24,7 +24,7 @@ export default async function AdminHome({
   }>;
 }) {
   const sp = await searchParams;
-  const view: AdminView = sp.view === 'kanban' ? 'kanban' : 'table';
+  const view: AdminView = sp.view === 'table' ? 'table' : 'kanban';
   const [rows, statuses, categories, team] = await Promise.all([
     loadSubmissions(sp),
     loadStatuses(),
