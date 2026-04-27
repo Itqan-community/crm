@@ -18,6 +18,7 @@ import {
 import type { StatusRow } from '@/types/database';
 import type { SubmissionListRow } from '@/lib/admin-queries';
 import { setSubmissionStatus } from '@/lib/admin-actions';
+import { CategoryBadge } from './CategoryBadge';
 import { LocalTime } from './LocalTime';
 
 type Props = {
@@ -184,7 +185,11 @@ function CardView({ row, statusColor, dragging = false }: { row: SubmissionListR
         {row.submitter_email}
       </div>
       <div className="flex items-center justify-between gap-2 text-[11.5px]" style={{ color: 'var(--muted)' }}>
-        <span>{row.category?.label_ar || '—'}</span>
+        {row.category ? (
+          <CategoryBadge label={row.category.label_ar} categoryKey={row.category.key} />
+        ) : (
+          <span>—</span>
+        )}
         <div className="flex items-center gap-1.5">
           {row.assignee && (
             <Avatar name={row.assignee.full_name || row.assignee.email} />
