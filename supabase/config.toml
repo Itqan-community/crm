@@ -1,0 +1,21 @@
+# Supabase project configuration.
+#
+# Used by the Supabase CLI (`supabase db push`, `supabase config push`) to
+# apply auth and email-template settings to the hosted project so they are
+# version-controlled alongside the code rather than living only in the
+# Dashboard.
+
+project_id = "crm"
+
+[auth.email]
+# Send only the 6-digit OTP, not a clickable magic link, to match the current
+# /admin login flow which calls supabase.auth.signInWithOtp + verifyOtp.
+enable_confirmations = false
+
+# Arabic, right-to-left email shown to users when they request a login code.
+# Edit supabase/templates/magic_link.html to change the contents — the file is
+# the source of truth and overrides whatever is configured in the Dashboard
+# the next time `supabase config push` runs.
+[auth.email.template.magic_link]
+subject = "رمز الدخول إلى لوحة إتقان"
+content_path = "./supabase/templates/magic_link.html"

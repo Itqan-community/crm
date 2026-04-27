@@ -55,6 +55,10 @@ npm run dev        # http://localhost:3000
 
 3. **Authentication → Providers → Email**: تأكد أن **Enable Email Provider** مفعّل. اترك OTP/Magic Link افتراضياً.
 
+   **قالب رمز الدخول بالعربي (RTL)**: قالب OTP العربي محفوظ في [`supabase/templates/magic_link.html`](supabase/templates/magic_link.html) وإعداده في [`supabase/config.toml`](supabase/config.toml). لتطبيقه:
+   - عبر Supabase CLI: `supabase config push` (يقرأ `supabase/config.toml`).
+   - أو يدوياً من الـ Dashboard → Authentication → Email Templates → **Magic Link**: انسخ محتوى الملف والصق في **Message Body**، واضبط **Subject** إلى `رمز الدخول إلى لوحة إتقان`.
+
 4. **بوابة الدخول (allowed_emails)**: يبدأ النظام بـ `abdulrahman@itqan.dev` كأدمن (من seed). تضيف البقية من `/admin/settings` بعد أول دخول.
 
 ---
