@@ -20,7 +20,7 @@ export function TeamAdmin({ team, allowed }: { team: TeamMemberRow[]; allowed: A
       <h2 className="text-[16px] font-semibold mb-4">الفريق والصلاحيات</h2>
 
       <div>
-        <div className="text-[13px] mb-2" style={{ color: 'var(--muted)' }}>قائمة البريد المسموح:</div>
+        <div className="text-[13px] mb-2" style={{ color: 'var(--muted)' }}>البريد المسموح بالدخول:</div>
         <ul className="divide-y" style={{ borderColor: 'var(--rule-soft)' }}>
           {allowed.length === 0 && (
             <li className="text-[13px] py-2" style={{ color: 'var(--muted)' }}>لا يوجد بعد.</li>
@@ -43,7 +43,7 @@ export function TeamAdmin({ team, allowed }: { team: TeamMemberRow[]; allowed: A
                     className="text-[11.5px] px-2 py-0.5 rounded-full border"
                     style={{ borderColor: 'var(--rule)', color: 'var(--muted)' }}
                   >
-                    {a.role === 'admin' ? 'أدمن' : 'عضو'}
+                    {a.role === 'admin' ? 'مدير' : 'عضو'}
                   </span>
                   <span
                     className="text-[11.5px] px-2 py-0.5 rounded-full"
@@ -58,7 +58,7 @@ export function TeamAdmin({ team, allowed }: { team: TeamMemberRow[]; allowed: A
                   <button
                     type="button"
                     onClick={() => {
-                      if (!confirm(`إزالة ${a.email} من قائمة المسموح؟`)) return;
+                      if (!confirm(`إزالة ${a.email} من قائمة المسموح بالدخول؟`)) return;
                       startTransition(() => removeAllowedEmail(a.email));
                     }}
                     className="text-[12.5px] hover:underline"
