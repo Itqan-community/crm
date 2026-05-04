@@ -65,23 +65,35 @@ type MetricsByWeek = Record<string, Record<string, number>>;
 
 async function loadMetricsTable(weekStarts: Date[]): Promise<MetricsByWeek> {
   if (weekStarts.length === 0) return {};
-  const supabase = await createSupabaseServerClient();
   const startKeys = weekStarts.map(weekKey);
-  const { data, error } = await supabase
-    .from('dashboard_metrics')
-    .select('week_start, metric_key, value')
-    .in('week_start', startKeys);
-  if (error) {
-    console.warn('[dashboard-queries] metrics table read failed', error.message);
-    return Object.fromEntries(startKeys.map((k) => [k, {}]));
+  const empty = (): MetricsByWeek =>
+    Object.fromEntries(startKeys.map((k) => [k, {}]));
+  // Wrap the entire round-trip in try/catch — Supabase's client *usually*
+  // returns errors in `{ error }` rather than throwing, but networking
+  // glitches and 4xx PostgREST responses occasionally bubble up as thrown
+  // exceptions. We never want a missing-table or transient outage to 500
+  // the dashboard.
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data, error } = await supabase
+      .from('dashboard_metrics')
+      .select('week_start, metric_key, value')
+      .in('week_start', startKeys);
+    if (error) {
+      console.warn('[dashboard-queries] metrics table read failed', error.message);
+      return empty();
+    }
+    const out = empty();
+    for (const row of data ?? []) {
+      const key = row.week_start as string;
+      if (!out[key]) out[key] = {};
+      out[key][row.metric_key as string] = Number(row.value);
+    }
+    return out;
+  } catch (err) {
+    console.warn('[dashboard-queries] metrics table threw', err);
+    return empty();
   }
-  const out: MetricsByWeek = Object.fromEntries(startKeys.map((k) => [k, {}]));
-  for (const row of data ?? []) {
-    const key = row.week_start as string;
-    if (!out[key]) out[key] = {};
-    out[key][row.metric_key as string] = Number(row.value);
-  }
-  return out;
 }
 
 function pct(now: number, prev: number): number | null {
@@ -123,6 +135,18 @@ function pick(
 }
 
 export async function loadDashboardData(now: Date = new Date()): Promise<DashboardData> {
+  try {
+    return await loadDashboardDataImpl(now);
+  } catch (err) {
+    // The dashboard is the admin's first impression — never 500 it.
+    // Reported to Sentry server-side; the UI degrades to all-zero,
+    // all-manual cards while we recover.
+    console.error('[dashboard-queries] loadDashboardData failed', err);
+    return emptyDashboardData(now);
+  }
+}
+
+async function loadDashboardDataImpl(now: Date): Promise<DashboardData> {
   const weekStarts = lastNWeekStarts(8, now);
   const currentStart = weekStarts[weekStarts.length - 1];
   const previousStart = addWeeks(currentStart, -1);
@@ -194,12 +218,15 @@ export async function loadDashboardData(now: Date = new Date()): Promise<Dashboa
   // and `newUsers.value`.
   const curForum = statsCurrent.forum?.metrics;
   const prevForum = statsPrev.forum?.metrics;
-  const forumPostsCur = curForum?.newPosts.value ?? cur(METRIC_KEYS.engagementReplies);
-  const forumDiscCur = curForum?.newDiscussions.value ?? cur(METRIC_KEYS.engagementMentions);
-  const forumNewUsersCur = curForum?.newUsers.value ?? 0;
-  const forumPostsPrev = prevForum?.newPosts.value ?? prev(METRIC_KEYS.engagementReplies);
-  const forumDiscPrev = prevForum?.newDiscussions.value ?? prev(METRIC_KEYS.engagementMentions);
-  const forumNewUsersPrev = prevForum?.newUsers.value ?? 0;
+  // Defensive `?.` on every nested field — the live stats API may evolve
+  // its shape, and an unexpected null (e.g. `newPosts` rendered as a bare
+  // number rather than `{ value }`) used to crash the whole page.
+  const forumPostsCur = curForum?.newPosts?.value ?? cur(METRIC_KEYS.engagementReplies);
+  const forumDiscCur = curForum?.newDiscussions?.value ?? cur(METRIC_KEYS.engagementMentions);
+  const forumNewUsersCur = curForum?.newUsers?.value ?? 0;
+  const forumPostsPrev = prevForum?.newPosts?.value ?? prev(METRIC_KEYS.engagementReplies);
+  const forumDiscPrev = prevForum?.newDiscussions?.value ?? prev(METRIC_KEYS.engagementMentions);
+  const forumNewUsersPrev = prevForum?.newUsers?.value ?? 0;
   // Manual "shares" sub-component: stats doesn't model reposts/shares
   // separately, so this stays a manual field.
   const engagementSharesCur = cur(METRIC_KEYS.engagementShares);
@@ -308,7 +335,7 @@ export async function loadDashboardData(now: Date = new Date()): Promise<Dashboa
     [prev(METRIC_KEYS.beneficiariesTotal), 'manual'],
   ]);
   const beneficiariesNew =
-    curForum?.newUsers.value ?? cur(METRIC_KEYS.beneficiariesNew);
+    curForum?.newUsers?.value ?? cur(METRIC_KEYS.beneficiariesNew);
 
   // ----- Consumption (manual) -----
   // Stats's apps endpoint exposes only cumulative `totalViews` / `totalClicks`
@@ -334,11 +361,11 @@ export async function loadDashboardData(now: Date = new Date()): Promise<Dashboa
   // Forum endpoint's `newPosts.value` is the weekly bucket; `totalPosts`
   // is cumulative and would mask weekly movement.
   const sharesPicked = pick([
-    [curForum?.newPosts.value, 'stats:forum'],
+    [curForum?.newPosts?.value, 'stats:forum'],
     [cur(METRIC_KEYS.shares), 'manual'],
   ]);
   const sharesPickedPrev = pick([
-    [prevForum?.newPosts.value, 'stats:forum'],
+    [prevForum?.newPosts?.value, 'stats:forum'],
     [prev(METRIC_KEYS.shares), 'manual'],
   ]);
 
@@ -471,4 +498,54 @@ export async function loadMetricsForWeeks(weekStarts: Date[]): Promise<MetricsBy
 
 export function makeWeekStartFromKsa(date: Date = new Date()): Date {
   return startOfKsaWeek(date);
+}
+
+// All-zero fallback used when the live data pipeline throws. We still
+// compute the date range correctly (cheap, all-local math) so the
+// header reads right; the cards show zeros with manual-source labels.
+function emptyDashboardData(now: Date): DashboardData {
+  const weekStarts = lastNWeekStarts(8, now);
+  const currentStart = weekStarts[weekStarts.length - 1];
+  const previousStart = addWeeks(currentStart, -1);
+  const weekEnd = new Date(currentStart.getTime() + 7 * 24 * 3_600_000 - 1);
+  const previousEnd = new Date(currentStart.getTime() - 1);
+  const zeros = Array.from({ length: 8 }, () => 0);
+  const zeroSeries = { now: zeros, prev: zeros };
+  const z = (source: MetricSource = 'manual') => ({
+    value: 0,
+    delta: null as number | null,
+    source,
+  });
+  return {
+    range: {
+      startISO: currentStart.toISOString(),
+      endISO: weekEnd.toISOString(),
+      hijriLabel: formatHijriRange(currentStart, weekEnd),
+      gregorianLabel: formatGregorianRange(currentStart, weekEnd),
+      compareHijriLabel: `${formatHijri(previousStart)} – ${formatHijri(previousEnd)}`,
+    },
+    community: {
+      newsletter: { ...z(), rate: 0, prevRate: 0, opened: 0, sent: 0 },
+      engagement: { ...z(), breakdown: [] },
+      socialReach: { ...z(), channels: [] },
+      siteVisits: { ...z(), uniq: 0, returning: 0 },
+    },
+    platform: {
+      publishers: { ...z(), new: 0 },
+      beneficiaries: { ...z(), new: 0 },
+      consumption: { ...z(), mix: [] },
+      shares: { ...z() },
+    },
+    series: {
+      newsletter: zeroSeries,
+      engagement: zeroSeries,
+      socialReach: zeroSeries,
+      siteVisits: zeroSeries,
+      publishers: zeroSeries,
+      beneficiaries: zeroSeries,
+      consumption: zeroSeries,
+      shares: zeroSeries,
+    },
+    days: weekStarts.map(() => '—'),
+  };
 }
