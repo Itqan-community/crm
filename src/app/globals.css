@@ -34,11 +34,16 @@ input, textarea {
   --accent: #1B4332;
   --accent-strong: #1B4332;
   --accent-fg: #FAF6F0;
+  --accent-soft: rgba(27,67,50,0.08);
   --option-bg: #FFFFFF;
   --option-bg-selected: #F1EFE7;
   --option-border: rgba(27,67,50,0.12);
   --option-border-hover: rgba(27,67,50,0.3);
   --danger: #B0493A;
+  --warn: #C9883B;
+  --success: #2F7A4F;
+  --info: #3D6B8C;
+  --gold: #946E52;
   --font-body: var(--font-rubik);
   --font-display: var(--font-rubik);
 }
@@ -51,11 +56,16 @@ input, textarea {
   --accent: #2D2D2D;
   --accent-strong: #1B4332;
   --accent-fg: #FAF6F0;
+  --accent-soft: rgba(0,0,0,0.05);
   --option-bg: transparent;
   --option-bg-selected: rgba(27,67,50,0.06);
   --option-border: rgba(0,0,0,0.12);
   --option-border-hover: rgba(0,0,0,0.28);
   --danger: #9A3D2F;
+  --warn: #B57730;
+  --success: #2F6E45;
+  --info: #345E7A;
+  --gold: #8A6549;
   --font-body: var(--font-ibm-plex-arabic);
   --font-display: var(--font-ibm-plex-arabic);
 }
@@ -68,11 +78,16 @@ input, textarea {
   --accent: #946E52;
   --accent-strong: #77573F;
   --accent-fg: #FBF7EF;
+  --accent-soft: rgba(176,137,104,0.12);
   --option-bg: #FFFDF8;
   --option-bg-selected: #F4EADC;
   --option-border: rgba(176,137,104,0.25);
   --option-border-hover: rgba(176,137,104,0.5);
   --danger: #A0452C;
+  --warn: #C9883B;
+  --success: #2F7A4F;
+  --info: #3D6B8C;
+  --gold: #946E52;
   --font-body: var(--font-rubik);
   --font-display: var(--font-rubik);
 }
@@ -85,11 +100,16 @@ input, textarea {
   --accent: #D4B483;
   --accent-strong: #E6C99A;
   --accent-fg: #122A20;
+  --accent-soft: rgba(212,180,131,0.14);
   --option-bg: rgba(241,233,216,0.04);
   --option-bg-selected: rgba(212,180,131,0.14);
   --option-border: rgba(241,233,216,0.18);
   --option-border-hover: rgba(212,180,131,0.5);
   --danger: #E89B86;
+  --warn: #E0B070;
+  --success: #87C19A;
+  --info: #8FB7D2;
+  --gold: #D4B483;
   --font-body: var(--font-rubik);
   --font-display: var(--font-scheherazade);
 }
@@ -194,3 +214,96 @@ button:active:not(:disabled) {
    hover; Next button uses :active brightness via the global rule above. */
 .form-nav-back:hover:not(:disabled) { color: var(--fg); }
 .form-nav-next:hover:not(:disabled) { filter: brightness(0.95); }
+
+/* ---- Dashboard utilities (لوحة البيانات) ----
+   Glass surfaces + atoms used by the admin dashboard. Theme-aware via
+   CSS variables defined above. Backdrop-filter keeps the gradient
+   ambience visible through cards. */
+.dash-glass {
+  background: color-mix(in srgb, var(--bg) 55%, white 45%);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--rule-soft);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.7) inset, 0 8px 24px -16px rgba(0,0,0,0.10);
+}
+:root[data-theme="deep"] .dash-glass {
+  background: color-mix(in srgb, var(--bg) 65%, transparent);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 8px 24px -16px rgba(0,0,0,0.4);
+}
+
+.dash-num { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+.dash-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+
+.dash-delta-up   { color: var(--success); }
+.dash-delta-down { color: var(--danger); }
+.dash-delta-flat { color: var(--muted); }
+
+/* segmented control (day/week/month) */
+.dash-seg {
+  display: inline-flex; padding: 3px;
+  background: var(--accent-soft);
+  border: 1px solid var(--rule-soft);
+  border-radius: 10px;
+}
+.dash-seg button {
+  padding: 6px 12px; border-radius: 7px;
+  font-size: 12.5px; font-weight: 500;
+  background: transparent; border: 0; color: var(--muted);
+  cursor: pointer; font-family: inherit;
+}
+.dash-seg button[aria-pressed="true"] {
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+.dash-seg button:disabled { cursor: not-allowed; opacity: 0.55; }
+
+.dash-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 14px; border-radius: 10px;
+  font-size: 13px; font-weight: 500;
+  border: 1px solid var(--rule);
+  background: var(--bg);
+  color: var(--fg);
+  cursor: pointer;
+  transition: all .18s ease;
+  font-family: inherit;
+}
+.dash-btn:hover:not(:disabled) { background: var(--option-bg-selected); }
+.dash-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.dash-btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.dash-btn-primary:hover:not(:disabled) { filter: brightness(1.08); background: var(--accent); }
+
+/* Ambient gradient backdrop for the dashboard page */
+.dash-amb {
+  position: relative;
+  background:
+    radial-gradient(900px 600px at 85% -5%, color-mix(in srgb, var(--gold) 22%, transparent), transparent 55%),
+    radial-gradient(800px 700px at -10% 50%, color-mix(in srgb, var(--accent) 18%, transparent), transparent 60%),
+    radial-gradient(700px 500px at 60% 100%, color-mix(in srgb, var(--gold) 14%, transparent), transparent 60%),
+    var(--bg);
+}
+
+/* Card grids — collapse to single column on mobile, two on tablet, full
+   layout on desktop. Tailwind's responsive grid utilities would do this
+   too; we use a CSS class so the cards file stays free of breakpoint
+   noise. */
+.dash-row { display: grid; gap: 14px; }
+.dash-row-3 { grid-template-columns: 1fr; }
+.dash-row-4 { grid-template-columns: 1fr; }
+@media (min-width: 720px) {
+  .dash-row-3 { grid-template-columns: repeat(2, 1fr); }
+  .dash-row-4 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 1100px) {
+  .dash-row-3 { grid-template-columns: 1.1fr 1fr 1fr; }
+  .dash-row-4 { grid-template-columns: 1fr 1fr 1.2fr 1fr; }
+}
+
+.dash-hero-grid { grid-template-columns: 1fr !important; }
+@media (min-width: 900px) { .dash-hero-grid { grid-template-columns: 1fr 1.4fr !important; } }
+.dash-hero-chart { min-height: 160px; }

@@ -19,7 +19,7 @@ export function FilterBar({ categories, statuses, team }: Props) {
     const next = new URLSearchParams(sp.toString());
     if (value) next.set(key, value);
     else next.delete(key);
-    startTransition(() => router.push('/admin?' + next.toString()));
+    startTransition(() => router.push('/admin/submissions?' + next.toString()));
   };
 
   const exportHref = '/admin/export?' + sp.toString();
