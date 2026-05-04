@@ -17,11 +17,9 @@ type Item = {
 // admin gating. The sidebar is `hidden md:flex`, which previously left
 // mobile users with zero navigation. This drawer fills that gap.
 const ITEMS: Item[] = [
-  { href: '/admin',                        label: 'لوحة البيانات',   icon: GridIcon,   adminOnly: false },
-  { href: '/admin/submissions',            label: 'الطلبات',          icon: InboxIcon,  adminOnly: false },
-  { href: '/admin/settings/metrics',       label: 'المؤشّرات',        icon: ChartIcon,  adminOnly: true  },
-  { href: '/admin/settings',               label: 'الحالات والفريق', icon: UsersIcon,  adminOnly: true  },
-  { href: '/admin/settings/form-builder',  label: 'بناء النموذج',    icon: WrenchIcon, adminOnly: true  },
+  { href: '/admin',                       label: 'الطلبات',          icon: InboxIcon,  adminOnly: false },
+  { href: '/admin/settings',              label: 'الحالات والفريق', icon: UsersIcon,  adminOnly: true  },
+  { href: '/admin/settings/form-builder', label: 'بناء النموذج',    icon: WrenchIcon, adminOnly: true  },
 ];
 
 export function MobileNav({ role }: { role: 'admin' | 'member' }) {
@@ -136,10 +134,7 @@ export function MobileNav({ role }: { role: 'admin' | 'member' }) {
             <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto">
               {items.map((it) => {
                 const Icon = it.icon;
-                const exactOnly = ITEMS.some((other) => other.href !== it.href && other.href.startsWith(it.href + '/'));
-                const isActive = exactOnly
-                  ? pathname === it.href
-                  : pathname === it.href || pathname.startsWith(it.href + '/');
+                const isActive = pathname === it.href || (it.href !== '/admin' && pathname.startsWith(it.href));
                 return (
                   <Link
                     key={it.href}
@@ -183,26 +178,6 @@ function CloseIcon() {
       strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <line x1="18" y1="6" x2="6" y2="18" />
       <line x1="6" y1="6" x2="18" y2="18" />
-    </svg>
-  );
-}
-
-function GridIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="7" rx="1.5" />
-      <rect x="14" y="3" width="7" height="7" rx="1.5" />
-      <rect x="3" y="14" width="7" height="7" rx="1.5" />
-      <rect x="14" y="14" width="7" height="7" rx="1.5" />
-    </svg>
-  );
-}
-
-function ChartIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M3 3v18h18" />
-      <path d="M7 14l3-3 3 4 5-7" />
     </svg>
   );
 }

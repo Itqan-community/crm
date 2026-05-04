@@ -33,7 +33,7 @@ export async function setSubmissionStatus(submissionId: string, statusId: string
     .eq('id', submissionId);
   if (error) throw new Error(error.message);
   revalidatePath(`/admin/submissions/${submissionId}`);
-  revalidatePath('/admin/submissions');
+  revalidatePath('/admin');
 }
 
 export async function archiveSubmissions(submissionIds: string[]) {
@@ -51,7 +51,7 @@ export async function archiveSubmissions(submissionIds: string[]) {
     .update({ status_id: archivedStatus.id })
     .in('id', submissionIds);
   if (error) throw new Error(error.message);
-  revalidatePath('/admin/submissions');
+  revalidatePath('/admin');
 }
 
 export async function setSubmissionAssignee(submissionId: string, assigneeId: string | null) {
@@ -62,7 +62,7 @@ export async function setSubmissionAssignee(submissionId: string, assigneeId: st
     .eq('id', submissionId);
   if (error) throw new Error(error.message);
   revalidatePath(`/admin/submissions/${submissionId}`);
-  revalidatePath('/admin/submissions');
+  revalidatePath('/admin');
 }
 
 export async function addNote(submissionId: string, body: string) {
