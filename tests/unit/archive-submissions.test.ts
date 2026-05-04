@@ -231,7 +231,7 @@ describe('archiveSubmissions', () => {
     expect(eqCalls).toEqual([{ method: 'eq', args: ['key', 'archived'] }]);
   });
 
-  it('revalidates only /admin (not /admin/submissions/[id]) on success', async () => {
+  it('revalidates only /admin/submissions (not /admin/submissions/[id]) on success', async () => {
     const ctx = makeSupabase({
       user: { id: 'u-1' },
       teamMember: { id: 'u-1', role: 'member' },
@@ -242,7 +242,7 @@ describe('archiveSubmissions', () => {
     await archiveSubmissions(['s-1']);
 
     expect(revalidatePath).toHaveBeenCalledTimes(1);
-    expect(revalidatePath).toHaveBeenCalledWith('/admin');
+    expect(revalidatePath).toHaveBeenCalledWith('/admin/submissions');
   });
 
   it('also works when called by an admin (not just a member)', async () => {
