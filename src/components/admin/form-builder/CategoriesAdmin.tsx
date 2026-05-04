@@ -12,6 +12,7 @@ const ICONS = [
   { value: 'code', label: 'كود' },
   { value: 'briefcase', label: 'حقيبة' },
   { value: 'message', label: 'رسالة' },
+  { value: 'handshake', label: 'مصافحة' },
 ];
 
 export function CategoriesAdmin({
