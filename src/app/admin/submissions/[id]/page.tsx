@@ -7,7 +7,8 @@ import { AssigneePicker } from '@/components/admin/AssigneePicker';
 import { NotesPanel } from '@/components/admin/NotesPanel';
 import { ActivityFeed } from '@/components/admin/ActivityFeed';
 import { LocalTime } from '@/components/admin/LocalTime';
-import type { Bilingual } from '@/types/database';
+import { SourceBadge } from '@/components/admin/SourceBadge';
+import type { Bilingual, SubmissionSource } from '@/types/database';
 
 export const dynamic = 'force-dynamic';
 
@@ -29,6 +30,7 @@ type SubmissionDetail = {
   category: CategoryRef | null;
   status: StatusRef | null;
   assignee: AuthorRef | null;
+  source?: SubmissionSource;
 };
 
 type AnswerRow = {
@@ -104,7 +106,15 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
   ]);
 
   if (!subData) notFound();
-  const sub = subData as unknown as SubmissionDetail;
+  // FE-only: detail rows always render with the public-form source until the
+  // backend phase persists `source` per submission.
+  const sub = {
+    ...(subData as unknown as SubmissionDetail),
+    source: (subData as unknown as SubmissionDetail).source ?? {
+      channel: 'form' as const,
+      referral: null,
+    },
+  };
   const answers = (answersData ?? []) as unknown as AnswerRow[];
   const notes = (notesData ?? []) as unknown as NoteRow[];
   const activity = (activityData ?? []) as unknown as ActivityRow[];
@@ -151,6 +161,15 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
               <FieldRow label="البريد" value={sub.submitter_email} dir="ltr" />
               <FieldRow label="اللغة" value={sub.language === 'ar' ? 'العربية' : 'English'} />
               <FieldRow label="نشرة إتقان" value={sub.newsletter_optin ? 'مشترك' : 'لا'} />
+              <div>
+                <dt className="text-[12px] font-medium uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>المصدر</dt>
+                <dd className="flex flex-wrap items-center gap-2">
+                  <SourceBadge source={sub.source} />
+                  {sub.source.referral && (
+                    <span style={{ color: 'var(--muted)' }}>· {sub.source.referral}</span>
+                  )}
+                </dd>
+              </div>
             </dl>
           </section>
 

@@ -1,13 +1,12 @@
-import { FilterBar } from '@/components/admin/FilterBar';
-import { ViewToggle, type AdminView } from '@/components/admin/ViewToggle';
-import { KanbanBoard } from '@/components/admin/KanbanBoard';
-import { SubmissionsTable } from '@/components/admin/SubmissionsTable';
+import { AdminListClient } from '@/components/admin/AdminListClient';
+import { type AdminView } from '@/components/admin/ViewToggle';
 import {
   loadSubmissions,
   loadStatuses,
   loadCategories,
   loadTeam,
 } from '@/lib/admin-queries';
+import { loadActiveFormSchema } from '@/lib/form-schema';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,36 +18,32 @@ export default async function AdminHome({
     category?: string;
     status?: string;
     assignee?: string;
+    source?: string;
     view?: string;
     include_archived?: string;
   }>;
 }) {
   const sp = await searchParams;
   const view: AdminView = sp.view === 'table' ? 'table' : 'kanban';
-  const [rows, statuses, categories, team] = await Promise.all([
+  const [rows, statuses, allCategories, team, schema] = await Promise.all([
     loadSubmissions(sp),
     loadStatuses(),
+    // Filter dropdown shows every category (incl. inactive ones still tied to
+    // legacy submissions); the manual-entry modal only offers active ones.
     loadCategories(true),
     loadTeam(),
+    loadActiveFormSchema(),
   ]);
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-[22px] font-semibold">الطلبات</h1>
-          <span className="text-[13px]" style={{ color: 'var(--muted)' }}>{rows.length} نتيجة</span>
-        </div>
-        <ViewToggle current={view} />
-      </div>
-
-      <FilterBar categories={categories} statuses={statuses} team={team} />
-
-      {view === 'kanban' ? (
-        <KanbanBoard submissions={rows} statuses={statuses} />
-      ) : (
-        <SubmissionsTable rows={rows} />
-      )}
-    </div>
+    <AdminListClient
+      view={view}
+      rows={rows}
+      statuses={statuses}
+      filterCategories={allCategories}
+      activeCategories={schema.categories}
+      fieldsByCategory={schema.fieldsByCategory}
+      team={team}
+    />
   );
 }

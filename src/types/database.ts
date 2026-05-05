@@ -70,6 +70,20 @@ export interface AllowedEmailRow {
   created_at: string;
 }
 
+export type SourceChannelKey =
+  | 'form'
+  | 'phone'
+  | 'whatsapp'
+  | 'email'
+  | 'event'
+  | 'referral'
+  | 'other';
+
+export interface SubmissionSource {
+  channel: SourceChannelKey;
+  referral?: string | null;
+}
+
 export interface SubmissionRow {
   id: string;
   reference_no: string;
@@ -82,6 +96,7 @@ export interface SubmissionRow {
   newsletter_optin: boolean;
   created_at: string;
   updated_at: string;
+  source?: SubmissionSource;
 }
 
 export interface SubmissionAnswerRow {

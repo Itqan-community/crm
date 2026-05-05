@@ -57,7 +57,14 @@ export async function loadSubmissions(filters: SubmissionFilters): Promise<Submi
 
   const { data, error } = await q;
   if (error) throw new Error(error.message);
-  return (data ?? []) as unknown as SubmissionListRow[];
+  // FE-only: default every server-fetched row to the public form channel.
+  // Once the backend phase adds a `source` column, replace this with the
+  // value from the row and drop the fallback.
+  const rows = (data ?? []) as unknown as SubmissionListRow[];
+  return rows.map((r) => ({
+    ...r,
+    source: r.source ?? { channel: 'form', referral: null },
+  }));
 }
 
 export async function loadStatuses(): Promise<StatusRow[]> {

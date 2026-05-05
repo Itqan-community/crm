@@ -19,6 +19,7 @@ import type { StatusRow } from '@/types/database';
 import type { SubmissionListRow } from '@/lib/admin-queries';
 import { setSubmissionStatus } from '@/lib/admin-actions';
 import { CategoryBadge } from './CategoryBadge';
+import { SourceBadge } from './SourceBadge';
 import { LocalTime } from './LocalTime';
 
 type Props = {
@@ -174,12 +175,15 @@ function CardView({ row, statusColor, dragging = false }: { row: SubmissionListR
         <div className="font-medium text-[13.5px] leading-snug truncate flex-1" style={{ color: 'var(--fg)' }}>
           {row.submitter_name}
         </div>
-        <span
-          className="text-[10.5px] font-mono shrink-0 px-1.5 py-0.5 rounded"
-          style={{ color: statusColor, background: 'var(--option-bg-selected)' }}
-        >
-          {row.reference_no}
-        </span>
+        <div className="flex items-center gap-1.5 shrink-0">
+          {row.source && <SourceBadge source={row.source} variant="compact" />}
+          <span
+            className="text-[10.5px] font-mono px-1.5 py-0.5 rounded"
+            style={{ color: statusColor, background: 'var(--option-bg-selected)' }}
+          >
+            {row.reference_no}
+          </span>
+        </div>
       </div>
       <div className="text-[11.5px] truncate mb-1" style={{ color: 'var(--muted)' }} dir="ltr">
         {row.submitter_email}

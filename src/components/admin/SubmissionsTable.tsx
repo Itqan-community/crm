@@ -6,6 +6,7 @@ import type { SubmissionListRow } from '@/lib/admin-queries';
 import { archiveSubmissions } from '@/lib/admin-actions';
 import { StatusBadge } from './StatusBadge';
 import { CategoryBadge } from './CategoryBadge';
+import { SourceBadge } from './SourceBadge';
 import { LocalTime } from './LocalTime';
 
 type Props = {
@@ -97,6 +98,7 @@ export function SubmissionsTable({ rows }: Props) {
               <Th>الاسم</Th>
               <Th>البريد</Th>
               <Th>الفئة</Th>
+              <Th>المصدر</Th>
               <Th>الحالة</Th>
               <Th>المسؤول</Th>
               <Th>التاريخ</Th>
@@ -105,7 +107,7 @@ export function SubmissionsTable({ rows }: Props) {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center" style={{ color: 'var(--muted)' }}>
+                <td colSpan={9} className="px-4 py-12 text-center" style={{ color: 'var(--muted)' }}>
                   لا توجد طلبات تطابق هذه الفلاتر.
                 </td>
               </tr>
@@ -147,6 +149,24 @@ export function SubmissionsTable({ rows }: Props) {
                   <Td>
                     {r.category ? (
                       <CategoryBadge label={r.category.label_ar} categoryKey={r.category.key} />
+                    ) : (
+                      '—'
+                    )}
+                  </Td>
+                  <Td>
+                    {r.source ? (
+                      <div className="flex flex-col gap-0.5 items-start">
+                        <SourceBadge source={r.source} />
+                        {r.source.referral && (
+                          <span
+                            className="text-[11px] truncate max-w-[160px]"
+                            style={{ color: 'var(--muted)' }}
+                            title={r.source.referral}
+                          >
+                            {r.source.referral}
+                          </span>
+                        )}
+                      </div>
                     ) : (
                       '—'
                     )}
