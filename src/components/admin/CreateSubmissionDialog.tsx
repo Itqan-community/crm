@@ -12,6 +12,7 @@ import type { SubmissionListRow } from '@/lib/admin-queries';
 import { SOURCE_CHANNELS } from '@/lib/source-channels';
 import { EMAIL_REGEX, parsePhoneSmart } from '@/lib/validation';
 import { FieldRenderer } from '@/components/form/fields/FieldRenderer';
+import { AdminPhoneInput } from './AdminPhoneInput';
 import {
   DialogShell,
   DialogActions,
@@ -50,6 +51,7 @@ export function CreateSubmissionDialog({
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [phone, setPhone] = useState('');
+  const [notes, setNotes] = useState('');
   const [customValues, setCustomValues] = useState<Record<string, FieldValue>>({});
   const [errors, setErrors] = useState<{
     name?: string;
@@ -79,6 +81,7 @@ export function CreateSubmissionDialog({
     setName('');
     setEmail('');
     setPhone('');
+    setNotes('');
     setCustomValues({});
     setErrors({});
   };
@@ -155,6 +158,7 @@ export function CreateSubmissionDialog({
         submitter_email: email.trim(),
         submitter_phone: phoneE164 || null,
         source: row.source,
+        notes: notes.trim() || null,
       },
       answers: answersPayload,
     });
@@ -165,49 +169,45 @@ export function CreateSubmissionDialog({
 
   return (
     <DialogShell onClose={() => { reset(); onClose(); }}>
-      <h3 className="text-[16px] font-semibold mb-1">طلب يدوي / Add submission</h3>
+      <h3 className="text-[16px] font-semibold mb-1">طلب يدوي</h3>
       <p className="text-[12.5px] mb-4" style={{ color: 'var(--muted)' }}>
-        محلي فقط — لن يُحفظ في قاعدة البيانات بعد. <span dir="ltr">FE-only preview.</span>
+        محلي فقط — لن يُحفظ في قاعدة البيانات بعد.
       </p>
 
       <div className="space-y-3 text-[13px]">
-        <div className="grid grid-cols-2 gap-3">
-          <DialogField label="القناة / Channel">
-            <DialogSelect<SourceChannelKey>
-              value={channel}
-              onChange={setChannel}
-              options={SOURCE_CHANNELS.filter((c) => c.key !== 'form').map((c) => ({
-                value: c.key,
-                label: `${c.icon}  ${c.label_ar} · ${c.label_en}`,
-              }))}
-            />
-          </DialogField>
-          <DialogField label="ملاحظة المصدر / Referral note (اختياري)">
-            <DialogInput
-              value={referral}
-              onChange={setReferral}
-              placeholder="مثال: LEAP 2026 booth"
-            />
-          </DialogField>
-        </div>
+        <DialogField label="القناة">
+          <DialogSelect<SourceChannelKey>
+            value={channel}
+            onChange={setChannel}
+            options={SOURCE_CHANNELS.filter((c) => c.key !== 'form').map((c) => ({
+              value: c.key,
+              label: `${c.icon}  ${c.label_ar}`,
+            }))}
+          />
+        </DialogField>
 
-        <DialogField label="الفئة / Category *">
+        <DialogField label="ملاحظة المصدر (اختياري)">
+          <DialogInput
+            value={referral}
+            onChange={setReferral}
+            placeholder="مثال: لقاء في معرض LEAP 2026"
+          />
+        </DialogField>
+
+        <DialogField label="الفئة *">
           <DialogSelect<string>
             value={categoryId}
             onChange={setCategoryId}
             options={[
               { value: '', label: '— اختر الفئة —' },
-              ...categories.map((c) => ({
-                value: c.id,
-                label: `${c.label_ar} · ${c.label_en}`,
-              })),
+              ...categories.map((c) => ({ value: c.id, label: c.label_ar })),
             ]}
           />
           {errors.category && <ErrText>{errors.category}</ErrText>}
         </DialogField>
 
-        <DialogField label="اللغة / Language">
-          <div className="flex gap-3 text-[13px]">
+        <DialogField label="اللغة">
+          <div className="flex gap-4 text-[13px]">
             <label className="inline-flex items-center gap-1.5">
               <input
                 type="radio"
@@ -222,41 +222,47 @@ export function CreateSubmissionDialog({
                 checked={language === 'en'}
                 onChange={() => setLanguage('en')}
               />
-              English
+              الإنجليزية
             </label>
           </div>
         </DialogField>
 
         <div className="border-t pt-3" style={{ borderColor: 'var(--rule-soft)' }}>
           <div className="text-[12px] mb-2" style={{ color: 'var(--muted)' }}>
-            معلومات التواصل / Contact
+            معلومات التواصل
           </div>
           <div className="space-y-2">
-            <DialogField label="الاسم / Name *">
+            <DialogField label="الاسم *">
               <DialogInput value={name} onChange={setName} />
               {errors.name && <ErrText>{errors.name}</ErrText>}
             </DialogField>
-            <DialogField label="البريد / Email">
-              <DialogInput value={email} onChange={setEmail} dir="ltr" placeholder="name@example.com" />
+            <DialogField label="البريد">
+              <DialogInput value={email} onChange={setEmail} dir="ltr" />
               {errors.email && <ErrText>{errors.email}</ErrText>}
             </DialogField>
-            <DialogField label="الهاتف / Phone">
-              <DialogInput
-                value={phone}
-                onChange={setPhone}
-                dir="ltr"
-                placeholder="+966501234567"
-              />
+            <DialogField label="الهاتف">
+              <AdminPhoneInput value={phone} onChange={setPhone} />
               {errors.phone && <ErrText>{errors.phone}</ErrText>}
             </DialogField>
             {errors.contact && <ErrText>{errors.contact}</ErrText>}
           </div>
         </div>
 
+        <DialogField label="ملاحظات إضافية (اختياري)">
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder="أي تفاصيل أو سياق يفيد الفريق…"
+            className="w-full px-3 py-2 rounded-lg border bg-transparent outline-none text-[13.5px] resize-y leading-6"
+            style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}
+          />
+        </DialogField>
+
         {customFields.length > 0 && (
           <div className="border-t pt-3" style={{ borderColor: 'var(--rule-soft)' }}>
             <div className="text-[12px] mb-2" style={{ color: 'var(--muted)' }}>
-              حقول الفئة (اختيارية) / Category fields (all optional)
+              حقول الفئة (اختيارية)
             </div>
             <div className="space-y-3">
               {customFields.map((f) => (
@@ -280,8 +286,8 @@ export function CreateSubmissionDialog({
       <DialogActions
         onCancel={() => { reset(); onClose(); }}
         onSave={onSave}
-        saveLabel="إضافة / Add"
-        cancelLabel="إلغاء / Cancel"
+        saveLabel="إضافة"
+        cancelLabel="إلغاء"
       />
     </DialogShell>
   );

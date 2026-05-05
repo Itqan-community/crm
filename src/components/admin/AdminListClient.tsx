@@ -71,7 +71,7 @@ export function AdminListClient({
             style={{ background: 'var(--accent)', color: 'var(--accent-fg)' }}
           >
             <span aria-hidden="true">+</span>
-            <span>إضافة طلب / Add submission</span>
+            <span>إضافة طلب</span>
           </button>
           <ViewToggle current={view} />
         </div>
