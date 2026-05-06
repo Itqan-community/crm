@@ -18,10 +18,28 @@ import { CreateSubmissionDialog } from './CreateSubmissionDialog';
 
 // The bulk-import wizard pulls in papaparse + read-excel-file (~80 kB
 // gzipped together). Defer its load until the operator actually clicks
-// the import button so first-paint /admin stays light.
+// the import button so first-paint /admin stays light. The visible
+// loading fallback also doubles as a diagnostic — if the chunk fails to
+// resolve, the operator sees the placeholder instead of an empty screen.
 const BulkImportDialog = dynamic(
   () => import('./BulkImportDialog').then((m) => ({ default: m.BulkImportDialog })),
-  { ssr: false },
+  {
+    ssr: false,
+    loading: () => (
+      <div
+        className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4"
+        role="status"
+        aria-live="polite"
+      >
+        <div
+          className="rounded-2xl px-5 py-4 border text-[13px]"
+          style={{ background: 'var(--bg)', borderColor: 'var(--rule)', color: 'var(--muted)' }}
+        >
+          جارٍ تحميل واجهة الاستيراد…
+        </div>
+      </div>
+    ),
+  },
 );
 
 type Props = {
