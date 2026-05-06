@@ -2,7 +2,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from './supabase/server';
-import { EMAIL_REGEX } from './validation';
+import { EMAIL_REGEX, parsePhoneSmart } from './validation';
+import type {
+  Lang,
+  SourceChannelKey,
+  SubmissionSource,
+} from '@/types/database';
 
 async function requireTeam() {
   const supabase = await createSupabaseServerClient();
@@ -63,6 +68,144 @@ export async function setSubmissionAssignee(submissionId: string, assigneeId: st
   if (error) throw new Error(error.message);
   revalidatePath(`/admin/submissions/${submissionId}`);
   revalidatePath('/admin');
+}
+
+// Used by the manual-entry modal. Inserts a submission with the chosen
+// source (channel + referral note), persists any category-specific custom
+// answers, and — if the team member typed something into the notes field —
+// posts that as the first internal note (which the existing trigger logs
+// as a `note_added` activity automatically).
+export async function createManualSubmission(input: {
+  category_id: string;
+  language: Lang;
+  submitter_name: string;
+  submitter_email: string | null;
+  submitter_phone: string | null;
+  source: { channel: SourceChannelKey; referral: string | null };
+  // field_id -> value entered in the modal for that custom field
+  custom_answers: Record<string, string | string[] | null>;
+  notes: string | null;
+}): Promise<{ id: string; reference_no: string }> {
+  const { supabase, member } = await requireTeam();
+
+  const name = input.submitter_name.trim();
+  const email = (input.submitter_email ?? '').trim().toLowerCase();
+  const phoneRaw = (input.submitter_phone ?? '').trim();
+
+  if (!name) throw new Error('name_required');
+  if (!email && !phoneRaw) throw new Error('contact_required');
+  if (email && !EMAIL_REGEX.test(email)) throw new Error('invalid_email');
+
+  let phoneE164: string | null = null;
+  if (phoneRaw) {
+    const r = parsePhoneSmart(phoneRaw);
+    if (!r.valid) throw new Error('invalid_phone');
+    phoneE164 = r.e164;
+  }
+
+  // Pull the category's active fields so we can snapshot labels alongside
+  // the answers — same pattern the public /api/submissions route uses.
+  const { data: catRow, error: catErr } = await supabase
+    .from('form_categories')
+    .select('id, is_active')
+    .eq('id', input.category_id)
+    .maybeSingle();
+  if (catErr) throw new Error(catErr.message);
+  if (!catRow) throw new Error('unknown_category');
+
+  const { data: fieldsData, error: fieldsErr } = await supabase
+    .from('form_fields')
+    .select('*')
+    .eq('category_id', input.category_id)
+    .eq('is_active', true);
+  if (fieldsErr) throw new Error(fieldsErr.message);
+  const fields = fieldsData ?? [];
+
+  const source: SubmissionSource = {
+    channel: input.source.channel,
+    referral: input.source.referral?.trim() || null,
+  };
+
+  const { data: inserted, error: subErr } = await supabase
+    .from('submissions')
+    .insert({
+      category_id: input.category_id,
+      language: input.language,
+      submitter_name: name,
+      submitter_email: email,
+      newsletter_optin: false,
+      source,
+    })
+    .select('id, reference_no')
+    .single();
+
+  if (subErr || !inserted) throw new Error(subErr?.message ?? 'submission_insert_failed');
+
+  // Phone gets stored as an answer against the category's phone field
+  // (matching the public-form path). If the category has no phone field
+  // we silently skip — the operator entered a phone we don't have a
+  // canonical slot for.
+  const phoneField = fields.find((f) => f.semantic_role === 'phone');
+
+  type AnswerInsert = {
+    submission_id: string;
+    field_id: string;
+    field_key_snap: string;
+    field_label_snap: { ar: string; en: string };
+    value_text: string | null;
+    value_json: unknown;
+  };
+
+  const answerRows: AnswerInsert[] = [];
+
+  if (phoneE164 && phoneField) {
+    answerRows.push({
+      submission_id: inserted.id,
+      field_id: phoneField.id,
+      field_key_snap: phoneField.key,
+      field_label_snap: { ar: phoneField.label_ar, en: phoneField.label_en },
+      value_text: phoneE164,
+      value_json: null,
+    });
+  }
+
+  for (const f of fields) {
+    if (['name', 'email', 'phone'].includes(f.semantic_role ?? '')) continue;
+    const v = input.custom_answers[f.id];
+    const isEmpty = v == null || v === '' || (Array.isArray(v) && v.length === 0);
+    if (isEmpty) continue;
+    answerRows.push({
+      submission_id: inserted.id,
+      field_id: f.id,
+      field_key_snap: f.key,
+      field_label_snap: { ar: f.label_ar, en: f.label_en },
+      value_text: typeof v === 'string' ? v : null,
+      value_json: Array.isArray(v) ? v : null,
+    });
+  }
+
+  if (answerRows.length > 0) {
+    const { error: ansErr } = await supabase
+      .from('submission_answers')
+      .insert(answerRows);
+    if (ansErr) {
+      // Best-effort cleanup so we don't leave a half-built row behind.
+      await supabase.from('submissions').delete().eq('id', inserted.id);
+      throw new Error(ansErr.message);
+    }
+  }
+
+  const noteBody = input.notes?.trim();
+  if (noteBody) {
+    await supabase.from('notes').insert({
+      submission_id: inserted.id,
+      author_id: member.id,
+      body: noteBody,
+    });
+  }
+
+  revalidatePath('/admin');
+  return { id: inserted.id, reference_no: inserted.reference_no };
 }
 
 export async function addNote(submissionId: string, body: string) {

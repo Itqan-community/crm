@@ -1,16 +1,16 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import type {
   FormCategoryRow,
   FormFieldRow,
   Lang,
   SourceChannelKey,
-  StatusRow,
 } from '@/types/database';
-import type { SubmissionListRow } from '@/lib/admin-queries';
 import { SOURCE_CHANNELS } from '@/lib/source-channels';
 import { EMAIL_REGEX, parsePhoneSmart } from '@/lib/validation';
+import { createManualSubmission } from '@/lib/admin-actions';
 import { FieldRenderer } from '@/components/form/fields/FieldRenderer';
 import { AdminPhoneInput } from './AdminPhoneInput';
 import {
@@ -25,25 +25,37 @@ type Props = {
   open: boolean;
   categories: FormCategoryRow[];
   fieldsByCategory: Record<string, FormFieldRow[]>;
-  statuses: StatusRow[];
   onClose: () => void;
-  onCreated: (row: SubmissionListRow) => void;
+  onCreated: (refNo: string) => void;
 };
 
 type FieldValue = string | string[] | undefined;
 
-// FE-only stub. Builds a SubmissionListRow client-side and hands it to the
-// parent for local merging. No DB write. The console-logged payload is the
-// shape we'd want a real `createManualSubmission` server action to accept
-// once the backend phase lands.
+const SERVER_ERRORS_AR: Record<string, string> = {
+  name_required: 'الاسم مطلوب',
+  contact_required: 'أدخل البريد أو رقم الهاتف على الأقل',
+  invalid_email: 'بريد غير صحيح',
+  invalid_phone: 'رقم هاتف غير صحيح',
+  unknown_category: 'الفئة غير معروفة',
+  unauthenticated: 'يلزم تسجيل الدخول',
+  forbidden: 'لا تملك صلاحية الإنشاء',
+};
+
+function translateError(msg: string): string {
+  return SERVER_ERRORS_AR[msg] ?? `تعذّر حفظ الطلب: ${msg}`;
+}
+
+// Calls the createManualSubmission server action and lets the parent
+// know what the new reference number is so it can show a success toast.
 export function CreateSubmissionDialog({
   open,
   categories,
   fieldsByCategory,
-  statuses,
   onClose,
   onCreated,
 }: Props) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
   const [channel, setChannel] = useState<SourceChannelKey>('phone');
   const [referral, setReferral] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
@@ -59,6 +71,7 @@ export function CreateSubmissionDialog({
     email?: string;
     phone?: string;
     category?: string;
+    submit?: string;
   }>({});
 
   const customFields = useMemo<FormFieldRow[]>(() => {
@@ -105,73 +118,49 @@ export function CreateSubmissionDialog({
 
   const onSave = () => {
     if (!validate()) return;
-    const category = categories.find((c) => c.id === categoryId);
-    const status = statuses.find((s) => s.is_default) ?? statuses[0];
-    if (!category || !status) return;
 
-    const now = new Date().toISOString();
-    const id = (typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : Math.random().toString(36).slice(2));
-    const ref =
-      'ITQ-MANUAL-' +
-      Math.random().toString(36).slice(2, 5).toUpperCase();
+    const phoneE164 = phone.trim() ? parsePhoneSmart(phone.trim()).e164 ?? null : null;
 
-    const phoneE164 = phone.trim() ? parsePhoneSmart(phone.trim()).e164 ?? phone.trim() : '';
+    const customAnswersPayload: Record<string, string | string[] | null> = {};
+    for (const f of customFields) {
+      const v = customValues[f.id];
+      if (v == null) continue;
+      if (typeof v === 'string') customAnswersPayload[f.id] = v;
+      else if (Array.isArray(v)) customAnswersPayload[f.id] = v;
+    }
 
-    const row: SubmissionListRow = {
-      id,
-      reference_no: ref,
-      category_id: category.id,
-      language,
-      status_id: status.id,
-      assignee_id: null,
-      submitter_name: name.trim(),
-      submitter_email: email.trim(),
-      newsletter_optin: false,
-      created_at: now,
-      updated_at: now,
-      source: {
-        channel,
-        referral: referral.trim() ? referral.trim() : null,
-      },
-      category: { key: category.key, label_ar: category.label_ar, label_en: category.label_en },
-      status: { key: status.key, label_ar: status.label_ar, label_en: status.label_en, color: status.color },
-      assignee: null,
-    };
-
-    // Mirror the shape the eventual server action will consume.
-    const answersPayload = customFields.map((f) => ({
-      field_id: f.id,
-      field_key: f.key,
-      field_label: { ar: f.label_ar, en: f.label_en },
-      value: customValues[f.id] ?? null,
-      semantic_role: f.semantic_role,
-    }));
-
-    // eslint-disable-next-line no-console
-    console.log('[manual submission — FE only, no DB write]', {
-      submission: {
-        category_id: category.id,
-        language,
-        submitter_name: name.trim(),
-        submitter_email: email.trim(),
-        submitter_phone: phoneE164 || null,
-        source: row.source,
-        notes: notes.trim() || null,
-      },
-      answers: answersPayload,
+    setErrors((prev) => ({ ...prev, submit: undefined }));
+    startTransition(async () => {
+      try {
+        const created = await createManualSubmission({
+          category_id: categoryId,
+          language,
+          submitter_name: name.trim(),
+          submitter_email: email.trim() || null,
+          submitter_phone: phoneE164,
+          source: {
+            channel,
+            referral: referral.trim() || null,
+          },
+          custom_answers: customAnswersPayload,
+          notes: notes.trim() || null,
+        });
+        onCreated(created.reference_no);
+        reset();
+        // Pull the latest list back from the server so the new row appears.
+        router.refresh();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : 'unknown';
+        setErrors((prev) => ({ ...prev, submit: translateError(msg) }));
+      }
     });
-
-    onCreated(row);
-    reset();
   };
 
   return (
-    <DialogShell onClose={() => { reset(); onClose(); }}>
+    <DialogShell onClose={() => { if (!pending) { reset(); onClose(); } }}>
       <h3 className="text-[16px] font-semibold mb-1">طلب يدوي</h3>
       <p className="text-[12.5px] mb-4" style={{ color: 'var(--muted)' }}>
-        محلي فقط — لن يُحفظ في قاعدة البيانات بعد.
+        أضف طلبًا وصلكم خارج النموذج العام، وحدد كيف وصل إليكم.
       </p>
 
       <div className="space-y-3 text-[13px]">
@@ -190,7 +179,7 @@ export function CreateSubmissionDialog({
           <DialogInput
             value={referral}
             onChange={setReferral}
-            placeholder="مثال: لقاء في معرض LEAP 2026"
+            placeholder="مثال: لقاء في مؤتمر الذكاء الاصطناعي"
           />
         </DialogField>
 
@@ -283,10 +272,17 @@ export function CreateSubmissionDialog({
         )}
       </div>
 
+      {errors.submit && (
+        <div className="mt-3 text-[13px]" style={{ color: 'var(--danger)' }}>
+          {errors.submit}
+        </div>
+      )}
+
       <DialogActions
         onCancel={() => { reset(); onClose(); }}
         onSave={onSave}
-        saveLabel="إضافة"
+        pending={pending}
+        saveLabel={pending ? 'جارٍ الحفظ…' : 'إضافة'}
         cancelLabel="إلغاء"
       />
     </DialogShell>

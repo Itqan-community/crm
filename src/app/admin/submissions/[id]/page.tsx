@@ -27,10 +27,10 @@ type SubmissionDetail = {
   newsletter_optin: boolean;
   submitter_name: string;
   submitter_email: string;
+  source: SubmissionSource;
   category: CategoryRef | null;
   status: StatusRef | null;
   assignee: AuthorRef | null;
-  source?: SubmissionSource;
 };
 
 type AnswerRow = {
@@ -78,7 +78,7 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
       .from('submissions')
       .select(
         `id, reference_no, language, created_at, updated_at, status_id, assignee_id, newsletter_optin,
-         submitter_name, submitter_email,
+         submitter_name, submitter_email, source,
          category:form_categories(id, key, label_ar, label_en),
          status:statuses(id, key, label_ar, label_en, color),
          assignee:team_members(id, email, full_name)`,
@@ -106,15 +106,7 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
   ]);
 
   if (!subData) notFound();
-  // FE-only: detail rows always render with the public-form source until the
-  // backend phase persists `source` per submission.
-  const sub = {
-    ...(subData as unknown as SubmissionDetail),
-    source: (subData as unknown as SubmissionDetail).source ?? {
-      channel: 'form' as const,
-      referral: null,
-    },
-  };
+  const sub = subData as unknown as SubmissionDetail;
   const answers = (answersData ?? []) as unknown as AnswerRow[];
   const notes = (notesData ?? []) as unknown as NoteRow[];
   const activity = (activityData ?? []) as unknown as ActivityRow[];

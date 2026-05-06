@@ -154,22 +154,18 @@ export function SubmissionsTable({ rows }: Props) {
                     )}
                   </Td>
                   <Td>
-                    {r.source ? (
-                      <div className="flex flex-col gap-0.5 items-start">
-                        <SourceBadge source={r.source} />
-                        {r.source.referral && (
-                          <span
-                            className="text-[11px] truncate max-w-[160px]"
-                            style={{ color: 'var(--muted)' }}
-                            title={r.source.referral}
-                          >
-                            {r.source.referral}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      '—'
-                    )}
+                    <div className="flex flex-col gap-0.5 items-start">
+                      <SourceBadge source={r.source} />
+                      {r.source.referral && (
+                        <span
+                          className="text-[11px] truncate max-w-[160px]"
+                          style={{ color: 'var(--muted)' }}
+                          title={r.source.referral}
+                        >
+                          {r.source.referral}
+                        </span>
+                      )}
+                    </div>
                   </Td>
                   <Td>
                     {r.status ? <StatusBadge label={r.status.label_ar} color={r.status.color} /> : '—'}

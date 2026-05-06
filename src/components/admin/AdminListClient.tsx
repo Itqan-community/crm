@@ -28,10 +28,10 @@ type Props = {
   team: TeamMemberRow[];
 };
 
-// Wraps the submissions list so we can hold locally-created (FE-only) rows
-// in client state and merge them into whichever view is active. Once the
-// backend phase wires manual entry to Supabase, this layer collapses back
-// down to passing server rows straight through.
+// Owns the modal open state, the source-filter, and a transient success
+// toast. Filtering by source is applied client-side because the existing
+// filter bar already pushes URL state and the source column is cheap to
+// filter in JS for the 200-row page size.
 export function AdminListClient({
   view,
   rows,
@@ -44,15 +44,13 @@ export function AdminListClient({
   const sp = useSearchParams();
   const sourceFilter = sp.get('source') ?? '';
 
-  const [localRows, setLocalRows] = useState<SubmissionListRow[]>([]);
   const [openModal, setOpenModal] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
-  const merged = useMemo(() => {
-    const all = [...localRows, ...rows];
-    if (!sourceFilter) return all;
-    return all.filter((r) => (r.source?.channel ?? 'form') === sourceFilter);
-  }, [localRows, rows, sourceFilter]);
+  const filtered = useMemo(() => {
+    if (!sourceFilter) return rows;
+    return rows.filter((r) => r.source.channel === sourceFilter);
+  }, [rows, sourceFilter]);
 
   return (
     <div>
@@ -60,7 +58,7 @@ export function AdminListClient({
         <div className="flex items-baseline gap-3">
           <h1 className="text-[22px] font-semibold">الطلبات</h1>
           <span className="text-[13px]" style={{ color: 'var(--muted)' }}>
-            {merged.length} نتيجة
+            {filtered.length} نتيجة
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -94,21 +92,19 @@ export function AdminListClient({
       )}
 
       {view === 'kanban' ? (
-        <KanbanBoard submissions={merged} statuses={statuses} />
+        <KanbanBoard submissions={filtered} statuses={statuses} />
       ) : (
-        <SubmissionsTable rows={merged} />
+        <SubmissionsTable rows={filtered} />
       )}
 
       <CreateSubmissionDialog
         open={openModal}
         categories={activeCategories}
         fieldsByCategory={fieldsByCategory}
-        statuses={statuses}
         onClose={() => setOpenModal(false)}
-        onCreated={(row) => {
-          setLocalRows((prev) => [row, ...prev]);
+        onCreated={(refNo) => {
           setOpenModal(false);
-          setToast('تمت إضافة الطلب محليًا — لم يُحفظ في قاعدة البيانات بعد.');
+          setToast(`تمت إضافة الطلب ${refNo}.`);
           window.setTimeout(() => setToast(null), 4000);
         }}
       />

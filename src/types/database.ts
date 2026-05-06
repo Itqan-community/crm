@@ -94,9 +94,9 @@ export interface SubmissionRow {
   submitter_name: string;
   submitter_email: string;
   newsletter_optin: boolean;
+  source: SubmissionSource;
   created_at: string;
   updated_at: string;
-  source?: SubmissionSource;
 }
 
 export interface SubmissionAnswerRow {

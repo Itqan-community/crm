@@ -26,7 +26,8 @@ export async function loadSubmissions(filters: SubmissionFilters): Promise<Submi
     .from('submissions')
     .select(
       `id, reference_no, category_id, language, status_id, assignee_id,
-       submitter_name, submitter_email, newsletter_optin, created_at, updated_at,
+       submitter_name, submitter_email, newsletter_optin, source,
+       created_at, updated_at,
        category:form_categories(key, label_ar, label_en),
        status:statuses(key, label_ar, label_en, color),
        assignee:team_members(id, email, full_name)`,
@@ -57,14 +58,7 @@ export async function loadSubmissions(filters: SubmissionFilters): Promise<Submi
 
   const { data, error } = await q;
   if (error) throw new Error(error.message);
-  // FE-only: default every server-fetched row to the public form channel.
-  // Once the backend phase adds a `source` column, replace this with the
-  // value from the row and drop the fallback.
-  const rows = (data ?? []) as unknown as SubmissionListRow[];
-  return rows.map((r) => ({
-    ...r,
-    source: r.source ?? { channel: 'form', referral: null },
-  }));
+  return (data ?? []) as unknown as SubmissionListRow[];
 }
 
 export async function loadStatuses(): Promise<StatusRow[]> {

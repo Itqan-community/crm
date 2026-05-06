@@ -176,7 +176,7 @@ function CardView({ row, statusColor, dragging = false }: { row: SubmissionListR
           {row.submitter_name}
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
-          {row.source && <SourceBadge source={row.source} variant="compact" />}
+          <SourceBadge source={row.source} variant="compact" />
           <span
             className="text-[10.5px] font-mono px-1.5 py-0.5 rounded"
             style={{ color: statusColor, background: 'var(--option-bg-selected)' }}
