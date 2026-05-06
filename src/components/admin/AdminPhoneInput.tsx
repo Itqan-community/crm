@@ -36,20 +36,36 @@ export function AdminPhoneInput({ value, onChange }: Props) {
            so the container must NOT clip overflow — otherwise the dropdown
            gets cut off and the flag in the selector button disappears. */
         .phone-admin-wrap .react-international-phone-input-container {
+          display: flex;
+          align-items: stretch;
           border: 1px solid var(--rule);
           border-radius: 0.5rem;
           background: transparent;
+          height: 38px;
         }
         .phone-admin-wrap .react-international-phone-input-container:focus-within {
           border-color: var(--accent);
         }
-        .phone-admin-wrap .react-international-phone-country-selector-button {
+        /* Stretch the country button to the full container height and center
+           the flag inside, so it lines up with the input text vertically. */
+        .phone-admin-wrap .react-international-phone-country-selector-button,
+        .phone-admin-wrap .react-international-phone-country-selector-button:hover,
+        .phone-admin-wrap .react-international-phone-country-selector-button:focus,
+        .phone-admin-wrap .react-international-phone-country-selector-button:active {
           background: transparent;
           border: none;
-          padding: 0 8px;
-          height: auto;
-          border-start-start-radius: 0.5rem;
-          border-end-start-radius: 0.5rem;
+          box-shadow: none;
+          outline: none;
+          padding: 0 10px;
+          height: 100%;
+          display: flex;
+          align-items: center;
+          gap: 4px;
+          cursor: pointer;
+          border-radius: 0;
+        }
+        .phone-admin-wrap .react-international-phone-country-selector-button:hover {
+          background: var(--rule-soft);
         }
         .phone-admin-wrap .react-international-phone-country-selector-dropdown {
           background: var(--bg);
@@ -81,10 +97,12 @@ export function AdminPhoneInput({ value, onChange }: Props) {
           background: transparent;
           border: none;
           color: var(--fg);
-          padding: 0.5rem 0.75rem;
+          padding: 0 0.75rem;
           font-size: 13.5px;
-          width: 100%;
+          flex: 1;
+          min-width: 0;
           outline: none;
+          height: 100%;
         }
         .phone-admin-wrap .react-international-phone-input::placeholder {
           color: var(--muted);
