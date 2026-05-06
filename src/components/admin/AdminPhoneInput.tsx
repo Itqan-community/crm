@@ -32,11 +32,13 @@ export function AdminPhoneInput({ value, onChange }: Props) {
         }}
       />
       <style jsx global>{`
+        /* The country dropdown is rendered as a child of the input container,
+           so the container must NOT clip overflow — otherwise the dropdown
+           gets cut off and the flag in the selector button disappears. */
         .phone-admin-wrap .react-international-phone-input-container {
           border: 1px solid var(--rule);
           border-radius: 0.5rem;
           background: transparent;
-          overflow: hidden;
         }
         .phone-admin-wrap .react-international-phone-input-container:focus-within {
           border-color: var(--accent);
@@ -46,12 +48,19 @@ export function AdminPhoneInput({ value, onChange }: Props) {
           border: none;
           padding: 0 8px;
           height: auto;
+          border-start-start-radius: 0.5rem;
+          border-end-start-radius: 0.5rem;
         }
         .phone-admin-wrap .react-international-phone-country-selector-dropdown {
           background: var(--bg);
           color: var(--fg);
           border: 1px solid var(--rule);
-          z-index: 50;
+          border-radius: 0.5rem;
+          box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.18);
+          z-index: 60;
+          min-width: 260px;
+          max-height: 280px;
+          overflow-y: auto;
         }
         .phone-admin-wrap .react-international-phone-country-selector-dropdown__list-item {
           color: var(--fg);
@@ -61,6 +70,9 @@ export function AdminPhoneInput({ value, onChange }: Props) {
         .phone-admin-wrap .react-international-phone-country-selector-dropdown__list-item:hover,
         .phone-admin-wrap .react-international-phone-country-selector-dropdown__list-item--focused {
           background: var(--rule-soft);
+        }
+        .phone-admin-wrap .react-international-phone-country-selector-dropdown__list-item-country-name {
+          color: var(--fg);
         }
         .phone-admin-wrap .react-international-phone-country-selector-dropdown__list-item-dial-code {
           color: var(--muted);
