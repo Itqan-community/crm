@@ -22,7 +22,6 @@ import {
 } from './DialogPrimitives';
 
 type Props = {
-  open: boolean;
   categories: FormCategoryRow[];
   fieldsByCategory: Record<string, FormFieldRow[]>;
   onClose: () => void;
@@ -50,8 +49,15 @@ function translateError(msg: string): string {
 
 // Calls the createManualSubmission server action and lets the parent
 // know what the new reference number is so it can show a success toast.
+//
+// Mounting: this dialog is rendered ONLY when the parent decides it
+// should be open — the parent does `{open && <CreateSubmissionDialog ... />}`.
+// We never accept an `open` prop and never early-return null. That's
+// deliberate: an early return inside a hooks-bearing component is the
+// React Rules-of-Hooks footgun (hook count differs between renders).
+// Letting the parent control mount/unmount also means closing the
+// dialog tears down all local state automatically — no manual reset.
 export function CreateSubmissionDialog({
-  open,
   categories,
   fieldsByCategory,
   onClose,
@@ -86,21 +92,6 @@ export function CreateSubmissionDialog({
       .filter((f) => !['name', 'email', 'phone'].includes(f.semantic_role ?? ''))
       .map((f) => ({ ...f, is_required: false }));
   }, [categoryId, fieldsByCategory]);
-
-  if (!open) return null;
-
-  const reset = () => {
-    setChannel('phone');
-    setReferral('');
-    setCategoryId('');
-    setLanguage('ar');
-    setName('');
-    setEmail('');
-    setPhone('');
-    setNotes('');
-    setCustomValues({});
-    setErrors({});
-  };
 
   const validate = () => {
     const next: typeof errors = {};
@@ -148,8 +139,9 @@ export function CreateSubmissionDialog({
           custom_answers: customAnswersPayload,
           notes: notes.trim() || null,
         });
+        // Parent unmounts the dialog on `onCreated`, which tears down our
+        // local state for free — no manual reset needed.
         onCreated(created.reference_no);
-        reset();
         // Pull the latest list back from the server so the new row appears.
         router.refresh();
       } catch (e) {
@@ -160,7 +152,7 @@ export function CreateSubmissionDialog({
   };
 
   return (
-    <DialogShell onClose={() => { if (!pending) { reset(); onClose(); } }}>
+    <DialogShell onClose={() => { if (!pending) onClose(); }}>
       <h3 className="text-[16px] font-semibold mb-1">طلب يدوي</h3>
       <p className="text-[12.5px] mb-4" style={{ color: 'var(--muted)' }}>
         أضف طلبًا وصلكم خارج النموذج العام، وحدد كيف وصل إليكم.
@@ -282,7 +274,7 @@ export function CreateSubmissionDialog({
       )}
 
       <DialogActions
-        onCancel={() => { reset(); onClose(); }}
+        onCancel={onClose}
         onSave={onSave}
         pending={pending}
         saveLabel={pending ? 'جارٍ الحفظ…' : 'إضافة'}

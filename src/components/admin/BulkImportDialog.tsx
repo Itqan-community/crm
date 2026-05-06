@@ -24,7 +24,6 @@ import { DialogShell } from './DialogPrimitives';
 type Step = 'upload' | 'map' | 'preview' | 'done';
 
 type Props = {
-  open: boolean;
   categories: FormCategoryRow[];
   existingRows: SubmissionListRow[];
   onClose: () => void;
@@ -69,8 +68,11 @@ const UNIQUE_ROLES: ColumnRole[] = [
   'name', 'email', 'phone', 'category', 'language', 'channel', 'referral', 'notes',
 ];
 
+// Mounting: parent renders this only when the wizard should be open. We
+// never accept an `open` prop and never early-return null. That keeps all
+// hooks unconditional (Rules of Hooks) and lets unmount-on-close be the
+// natural reset mechanism — no manual setStep/setParsed/etc. cleanup.
 export function BulkImportDialog({
-  open,
   categories,
   existingRows,
   onClose,
@@ -80,10 +82,6 @@ export function BulkImportDialog({
   const [parsed, setParsed] = useState<ParsedFile | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [parsing, setParsing] = useState(false);
-  // Bumping this remounts the <input type="file"> so its internal value is
-  // cleared on reset (you can't programmatically clear a file input value
-  // in some browsers any other way).
-  const [inputKey, setInputKey] = useState(0);
 
   const [mapping, setMapping] = useState<ColumnMapping[]>([]);
   const [defaultChannel, setDefaultChannel] = useState<SourceChannelKey>('referral');
@@ -92,26 +90,6 @@ export function BulkImportDialog({
   const [showOnlyIssues, setShowOnlyIssues] = useState(false);
   const [skipInvalidConfirmed, setSkipInvalidConfirmed] = useState(false);
   const [submittedSummary, setSubmittedSummary] = useState<{ ok: number; skipped: number } | null>(null);
-
-  if (!open) return null;
-
-  const reset = () => {
-    setStep('upload');
-    setParsed(null);
-    setParseError(null);
-    setMapping([]);
-    setDefaultChannel('referral');
-    setDefaultReferral('');
-    setShowOnlyIssues(false);
-    setSkipInvalidConfirmed(false);
-    setSubmittedSummary(null);
-    setInputKey((k) => k + 1);
-  };
-
-  const closeAndReset = () => {
-    reset();
-    onClose();
-  };
 
   // ---------- Upload ----------
 
@@ -191,7 +169,6 @@ export function BulkImportDialog({
   const onSubmit = () => {
     const accepted = validatedRows.filter((r) => r.status !== 'error');
     const skipped = counts.error;
-    // eslint-disable-next-line no-console
     console.log('[bulk import — FE only, no DB write]', {
       filename: parsed?.filename,
       defaultChannel,
@@ -215,7 +192,7 @@ export function BulkImportDialog({
   };
 
   return (
-    <DialogShell onClose={closeAndReset} size="3xl">
+    <DialogShell onClose={onClose} size="3xl">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[16px] font-semibold">{stepTitle[step]}</h3>
         <StepDots step={step} />
@@ -223,7 +200,6 @@ export function BulkImportDialog({
 
       {step === 'upload' && (
         <UploadStep
-          inputKey={inputKey}
           parsing={parsing}
           parseError={parseError}
           onPickFile={onPickFile}
@@ -261,7 +237,7 @@ export function BulkImportDialog({
       )}
 
       {step === 'done' && submittedSummary && (
-        <DoneStep summary={submittedSummary} onClose={closeAndReset} />
+        <DoneStep summary={submittedSummary} onClose={onClose} />
       )}
     </DialogShell>
   );
@@ -288,12 +264,10 @@ function StepDots({ step }: { step: Step }) {
 }
 
 function UploadStep({
-  inputKey,
   parsing,
   parseError,
   onPickFile,
 }: {
-  inputKey: number;
   parsing: boolean;
   parseError: string | null;
   onPickFile: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -309,7 +283,6 @@ function UploadStep({
         style={{ borderColor: 'var(--rule)' }}
       >
         <input
-          key={inputKey}
           type="file"
           accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={onPickFile}

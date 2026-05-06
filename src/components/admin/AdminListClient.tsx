@@ -116,28 +116,36 @@ export function AdminListClient({
         <SubmissionsTable rows={filtered} />
       )}
 
-      <CreateSubmissionDialog
-        open={openModal}
-        categories={activeCategories}
-        fieldsByCategory={fieldsByCategory}
-        onClose={() => setOpenModal(false)}
-        onCreated={(refNo) => {
-          setOpenModal(false);
-          setToast(`تمت إضافة الطلب ${refNo}.`);
-          window.setTimeout(() => setToast(null), 4000);
-        }}
-      />
+      {/*
+       * Dialogs are mounted only while open. The parent owns the lifecycle
+       * so the dialog component itself never has to early-return null,
+       * which would risk a Rules-of-Hooks violation when hooks live below
+       * the guard. Closing also unmounts and naturally tears down state.
+       */}
+      {openModal && (
+        <CreateSubmissionDialog
+          categories={activeCategories}
+          fieldsByCategory={fieldsByCategory}
+          onClose={() => setOpenModal(false)}
+          onCreated={(refNo) => {
+            setOpenModal(false);
+            setToast(`تمت إضافة الطلب ${refNo}.`);
+            window.setTimeout(() => setToast(null), 4000);
+          }}
+        />
+      )}
 
-      <BulkImportDialog
-        open={openImport}
-        categories={activeCategories}
-        existingRows={rows}
-        onClose={() => setOpenImport(false)}
-        onCreated={(count) => {
-          setToast(`تم استيراد ${count} طلب محليًا — لم تُحفظ في قاعدة البيانات بعد.`);
-          window.setTimeout(() => setToast(null), 5000);
-        }}
-      />
+      {openImport && (
+        <BulkImportDialog
+          categories={activeCategories}
+          existingRows={rows}
+          onClose={() => setOpenImport(false)}
+          onCreated={(count) => {
+            setToast(`تم استيراد ${count} طلب محليًا — لم تُحفظ في قاعدة البيانات بعد.`);
+            window.setTimeout(() => setToast(null), 5000);
+          }}
+        />
+      )}
     </div>
   );
 }
