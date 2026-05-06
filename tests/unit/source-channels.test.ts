@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { SOURCE_CHANNELS, getChannel } from '@/lib/source-channels';
+import {
+  SOURCE_CHANNELS,
+  getChannel,
+  isValidChannelKey,
+  selectableChannels,
+} from '@/lib/source-channels';
 
 describe('source-channels', () => {
   it('exposes a non-empty seed list', () => {
@@ -37,5 +42,40 @@ describe('source-channels', () => {
     // protects against bad data in the column once the migration is live.
     const fallback = getChannel('not-a-channel' as unknown as 'phone');
     expect(fallback.key).toBe('other');
+  });
+});
+
+describe('isValidChannelKey', () => {
+  it('returns true for every key in SOURCE_CHANNELS', () => {
+    for (const c of SOURCE_CHANNELS) {
+      expect(isValidChannelKey(c.key)).toBe(true);
+    }
+  });
+
+  it('returns false for unknown strings', () => {
+    expect(isValidChannelKey('sms')).toBe(false);
+    expect(isValidChannelKey('')).toBe(false);
+    expect(isValidChannelKey('Phone')).toBe(false); // case-sensitive
+  });
+
+  it('narrows the input type when used as a guard', () => {
+    const raw: string = 'phone';
+    if (isValidChannelKey(raw)) {
+      // Compile-time check: TypeScript should accept the narrowed type
+      // as SourceChannelKey here. At runtime we only assert behaviour.
+      expect(raw).toBe('phone');
+    }
+  });
+});
+
+describe('selectableChannels', () => {
+  it('omits the public-form channel (operators never pick that for manual entry)', () => {
+    const keys = selectableChannels().map((c) => c.key);
+    expect(keys).not.toContain('form');
+  });
+
+  it('returns every other channel in the original SOURCE_CHANNELS order', () => {
+    const expected = SOURCE_CHANNELS.filter((c) => c.key !== 'form').map((c) => c.key);
+    expect(selectableChannels().map((c) => c.key)).toEqual(expected);
   });
 });

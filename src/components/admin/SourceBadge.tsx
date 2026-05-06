@@ -1,5 +1,6 @@
 import type { SubmissionSource } from '@/types/database';
 import { getChannel } from '@/lib/source-channels';
+import { Tag } from './Tag';
 
 type Variant = 'full' | 'compact';
 
@@ -10,9 +11,9 @@ type Props = {
   lang?: 'ar' | 'en';
 };
 
-// Renders the channel for a submission. `compact` is the icon-only pill used
-// on Kanban cards; `full` is the icon + label pill used in the table and on
-// the detail page.
+// Renders the channel for a submission. `compact` is the icon-only square
+// used on Kanban cards (different shape from a Tag — a fixed 5×5 box, no
+// label). `full` is the standard tinted pill rendered via Tag.
 export function SourceBadge({ source, variant = 'full', lang = 'ar' }: Props) {
   const ch = getChannel(source.channel);
   const label = lang === 'en' ? ch.label_en : ch.label_ar;
@@ -36,17 +37,9 @@ export function SourceBadge({ source, variant = 'full', lang = 'ar' }: Props) {
   }
 
   return (
-    <span
-      title={tooltip}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[12px] font-medium border"
-      style={{
-        color: ch.color,
-        borderColor: ch.color + '40',
-        background: ch.color + '14',
-      }}
-    >
+    <Tag color={ch.color} title={tooltip}>
       <span aria-hidden="true" className="text-[11px]">{ch.icon}</span>
       <span>{label}</span>
-    </span>
+    </Tag>
   );
 }

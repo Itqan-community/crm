@@ -30,6 +30,21 @@ const BY_KEY: Record<SourceChannelKey, SourceChannel> = SOURCE_CHANNELS.reduce(
   {} as Record<SourceChannelKey, SourceChannel>,
 );
 
+const VALID_KEYS = new Set<string>(SOURCE_CHANNELS.map((c) => c.key));
+
 export function getChannel(key: SourceChannelKey): SourceChannel {
   return BY_KEY[key] ?? BY_KEY.other;
+}
+
+// Single source of truth for "is this a known channel key?", used by every
+// boundary that accepts channel input from the network or a CSV cell.
+export function isValidChannelKey(key: string): key is SourceChannelKey {
+  return VALID_KEYS.has(key);
+}
+
+// Channels selectable as a manual-entry / bulk-import default. We exclude
+// 'form' because public-form submissions arrive through /api/submissions,
+// not through any picker.
+export function selectableChannels(): SourceChannel[] {
+  return SOURCE_CHANNELS.filter((c) => c.key !== 'form');
 }

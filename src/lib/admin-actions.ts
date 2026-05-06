@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from './supabase/server';
 import { EMAIL_REGEX, parsePhoneSmart } from './validation';
-import { SOURCE_CHANNELS } from './source-channels';
+import { isValidChannelKey } from './source-channels';
 import type {
   Lang,
   SourceChannelKey,
@@ -17,7 +17,6 @@ const REFERRAL_MAX_LEN = 500;
 // Notes here are the team's own internal annotation; longer than the
 // referral hint but still capped to keep one POST predictable.
 const NOTES_MAX_LEN = 5000;
-const VALID_CHANNELS = new Set<string>(SOURCE_CHANNELS.map((c) => c.key));
 
 async function requireTeam() {
   const supabase = await createSupabaseServerClient();
@@ -101,7 +100,7 @@ export async function createManualSubmission(input: {
   // The TS type says channel is a known key, but TS types don't survive a
   // network hop — a hand-crafted RPC call could send anything. Guard at
   // the boundary so we never persist arbitrary strings into source.channel.
-  if (!VALID_CHANNELS.has(input.source.channel)) {
+  if (!isValidChannelKey(input.source.channel)) {
     throw new Error('invalid_channel');
   }
 

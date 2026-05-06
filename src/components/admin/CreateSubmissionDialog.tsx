@@ -8,7 +8,7 @@ import type {
   Lang,
   SourceChannelKey,
 } from '@/types/database';
-import { SOURCE_CHANNELS } from '@/lib/source-channels';
+import { selectableChannels } from '@/lib/source-channels';
 import { EMAIL_REGEX, parsePhoneSmart } from '@/lib/validation';
 import { createManualSubmission } from '@/lib/admin-actions';
 import { FieldRenderer } from '@/components/form/fields/FieldRenderer';
@@ -163,7 +163,7 @@ export function CreateSubmissionDialog({
           <DialogSelect<SourceChannelKey>
             value={channel}
             onChange={setChannel}
-            options={SOURCE_CHANNELS.filter((c) => c.key !== 'form').map((c) => ({
+            options={selectableChannels().map((c) => ({
               value: c.key,
               label: `${c.icon}  ${c.label_ar}`,
             }))}

@@ -6,7 +6,7 @@ import type {
   SourceChannelKey,
 } from '@/types/database';
 import type { SubmissionListRow } from '@/lib/admin-queries';
-import { SOURCE_CHANNELS } from '@/lib/source-channels';
+import { selectableChannels } from '@/lib/source-channels';
 import { autoMap } from '@/lib/bulk-import/auto-map';
 import { parseFile, MAX_IMPORT_ROWS } from '@/lib/bulk-import/parse-file';
 import {
@@ -20,6 +20,7 @@ import type {
   ValidatedRow,
 } from '@/lib/bulk-import/types';
 import { DialogShell } from './DialogPrimitives';
+import { Tag } from './Tag';
 
 type Step = 'upload' | 'map' | 'preview' | 'done';
 
@@ -358,7 +359,7 @@ function MapStep({
             className="w-full px-3 py-2 rounded-lg border bg-transparent text-[13.5px]"
             style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}
           >
-            {SOURCE_CHANNELS.filter((c) => c.key !== 'form').map((c) => (
+            {selectableChannels().map((c) => (
               <option key={c.key} value={c.key}>
                 {c.icon}  {c.label_ar}
               </option>
@@ -614,6 +615,8 @@ function DoneStep({
   );
 }
 
+// Per-row status (ok | warning | error). Slightly smaller text than a
+// regular Tag because the preview table is dense.
 function StatusBadge({ status }: { status: ValidatedRow['status'] }) {
   const map: Record<ValidatedRow['status'], { label: string; color: string }> = {
     ok: { label: 'جاهز', color: '#16A34A' },
@@ -621,23 +624,10 @@ function StatusBadge({ status }: { status: ValidatedRow['status'] }) {
     error: { label: 'خطأ', color: '#DC2626' },
   };
   const { label, color } = map[status];
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11.5px] font-medium border"
-      style={{ color, borderColor: color + '40', background: color + '14' }}
-    >
-      {label}
-    </span>
-  );
+  return <Tag color={color} className="text-[11.5px]">{label}</Tag>;
 }
 
+// Counter pill in the preview header (e.g. "جاهز 38").
 function Pill({ color, label }: { color: string; label: string }) {
-  return (
-    <span
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[12px] font-medium border"
-      style={{ color, borderColor: color + '40', background: color + '14' }}
-    >
-      {label}
-    </span>
-  );
+  return <Tag color={color}>{label}</Tag>;
 }

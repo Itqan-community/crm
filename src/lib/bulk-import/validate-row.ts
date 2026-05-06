@@ -5,15 +5,13 @@ import type {
 } from '@/types/database';
 import type { SubmissionListRow } from '@/lib/admin-queries';
 import { EMAIL_REGEX, parsePhoneSmart } from '@/lib/validation';
-import { SOURCE_CHANNELS } from '@/lib/source-channels';
+import { isValidChannelKey } from '@/lib/source-channels';
 import type {
   ColumnMapping,
   ParsedFile,
   RowValues,
   ValidatedRow,
 } from './types';
-
-const VALID_CHANNEL_KEYS = new Set<string>(SOURCE_CHANNELS.map((c) => c.key));
 
 // Snapshot of existing submissions, indexed by lowercased email for O(1)
 // dup-lookup per row. Phone-based dedup needs a server-side query against
@@ -128,7 +126,7 @@ export function validateRows(
     let channel: SourceChannelKey = opts.defaultChannel;
     const channelRaw = (raw[colByRole.get('channel') ?? ''] ?? '').trim().toLowerCase();
     if (channelRaw) {
-      if (VALID_CHANNEL_KEYS.has(channelRaw)) channel = channelRaw as SourceChannelKey;
+      if (isValidChannelKey(channelRaw)) channel = channelRaw;
       else errors.push(`قناة غير معروفة: ${channelRaw}`);
     }
     const referralRaw = (raw[colByRole.get('referral') ?? ''] ?? '').trim();
