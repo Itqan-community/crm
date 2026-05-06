@@ -139,7 +139,14 @@ export async function createManualSubmission(input: {
     .select('id, reference_no')
     .single();
 
-  if (subErr || !inserted) throw new Error(subErr?.message ?? 'submission_insert_failed');
+  if (subErr || !inserted) {
+    // 42703 = undefined column. Migration 0011 (which adds `source`)
+    // hasn't been applied to this Supabase project yet. Surface a clear
+    // code so the modal can show a friendly Arabic message instead of a
+    // raw Postgres error.
+    if (subErr?.code === '42703') throw new Error('migration_required');
+    throw new Error(subErr?.message ?? 'submission_insert_failed');
+  }
 
   // Phone gets stored as an answer against the category's phone field
   // (matching the public-form path). If the category has no phone field

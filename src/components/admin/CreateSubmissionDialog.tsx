@@ -39,6 +39,8 @@ const SERVER_ERRORS_AR: Record<string, string> = {
   unknown_category: 'الفئة غير معروفة',
   unauthenticated: 'يلزم تسجيل الدخول',
   forbidden: 'لا تملك صلاحية الإنشاء',
+  migration_required:
+    'لم يتم تفعيل خاصية المصدر على قاعدة البيانات بعد. شغّل migration 0011 ثم أعد المحاولة.',
 };
 
 function translateError(msg: string): string {

@@ -66,25 +66,30 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/admin/login');
 
+  // First-pass select asks for `source`; if migration 0011 hasn't run yet
+  // Postgres returns 42703 and we retry without it, defaulting source to
+  // the public-form channel so the page still renders.
+  const SUB_BASE_COLS = `id, reference_no, language, created_at, updated_at, status_id, assignee_id, newsletter_optin,
+    submitter_name, submitter_email,
+    category:form_categories(id, key, label_ar, label_en),
+    status:statuses(id, key, label_ar, label_en, color),
+    assignee:team_members(id, email, full_name)`;
+
+  const subWithSource = supabase
+    .from('submissions')
+    .select(SUB_BASE_COLS.replace('newsletter_optin,', 'newsletter_optin, source,'))
+    .eq('id', id)
+    .maybeSingle();
+
   const [
-    { data: subData },
+    subResult,
     { data: answersData },
     { data: notesData },
     { data: activityData },
     statuses,
     team,
   ] = await Promise.all([
-    supabase
-      .from('submissions')
-      .select(
-        `id, reference_no, language, created_at, updated_at, status_id, assignee_id, newsletter_optin,
-         submitter_name, submitter_email, source,
-         category:form_categories(id, key, label_ar, label_en),
-         status:statuses(id, key, label_ar, label_en, color),
-         assignee:team_members(id, email, full_name)`,
-      )
-      .eq('id', id)
-      .maybeSingle(),
+    subWithSource,
     // Pull the originating field's position in the same query, so we can
     // restore the form's authoring order without a follow-up roundtrip.
     supabase
@@ -105,8 +110,24 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
     loadTeam(),
   ]);
 
-  if (!subData) notFound();
-  const sub = subData as unknown as SubmissionDetail;
+  let sub: SubmissionDetail | null = null;
+  if (!subResult.error) {
+    sub = subResult.data as unknown as SubmissionDetail | null;
+  } else if (subResult.error.code === '42703') {
+    const fb = await supabase
+      .from('submissions')
+      .select(SUB_BASE_COLS)
+      .eq('id', id)
+      .maybeSingle();
+    if (fb.error) throw new Error(fb.error.message);
+    sub = fb.data
+      ? ({ ...fb.data, source: { channel: 'form', referral: null } } as unknown as SubmissionDetail)
+      : null;
+  } else {
+    throw new Error(subResult.error.message);
+  }
+
+  if (!sub) notFound();
   const answers = (answersData ?? []) as unknown as AnswerRow[];
   const notes = (notesData ?? []) as unknown as NoteRow[];
   const activity = (activityData ?? []) as unknown as ActivityRow[];
