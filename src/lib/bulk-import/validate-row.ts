@@ -15,39 +15,22 @@ import type {
 
 const VALID_CHANNEL_KEYS = new Set<string>(SOURCE_CHANNELS.map((c) => c.key));
 
-// Snapshot of the existing submissions list, indexed by the contact keys
-// we use to detect duplicates. Built once before validation so each row
-// only does O(1) lookups.
+// Snapshot of existing submissions, indexed by lowercased email for O(1)
+// dup-lookup per row. Phone-based dedup needs a server-side query against
+// submission_answers (phones don't live on the row itself); we'll add it
+// in the BE phase rather than carry an unused stub here.
 type DuplicateIndex = {
   byEmail: Map<string, SubmissionListRow>;
-  byPhone: Map<string, SubmissionListRow>;
 };
 
 export function buildDuplicateIndex(
   existing: SubmissionListRow[],
 ): DuplicateIndex {
   const byEmail = new Map<string, SubmissionListRow>();
-  const byPhone = new Map<string, SubmissionListRow>();
   for (const r of existing) {
     if (r.submitter_email) byEmail.set(r.submitter_email.toLowerCase(), r);
   }
-  return { byEmail, byPhone };
-}
-
-// Existing submissions don't carry a phone column on the row itself —
-// it's stored as an answer. The wizard receives a separate phone index
-// fetched alongside the submissions list, mapping E.164 → submission.
-export function indexExistingPhones(
-  existing: SubmissionListRow[],
-  phoneAnswers: { submission_id: string; e164: string }[],
-): Map<string, SubmissionListRow> {
-  const byId = new Map(existing.map((r) => [r.id, r]));
-  const out = new Map<string, SubmissionListRow>();
-  for (const p of phoneAnswers) {
-    const sub = byId.get(p.submission_id);
-    if (sub) out.set(p.e164, sub);
-  }
-  return out;
+  return { byEmail };
 }
 
 export type ValidateOptions = {
@@ -162,14 +145,10 @@ export function validateRows(
       if (v) custom_answers[col] = v;
     }
 
-    // ----- Duplicate detection -----
+    // ----- Duplicate detection (email only; see DuplicateIndex comment) -----
     if (email && opts.duplicateIndex.byEmail.has(email)) {
       const dup = opts.duplicateIndex.byEmail.get(email)!;
       warnings.push(`بريد مكرر — موجود مسبقًا (${dup.reference_no})`);
-    }
-    if (phone && opts.duplicateIndex.byPhone.has(phone)) {
-      const dup = opts.duplicateIndex.byPhone.get(phone)!;
-      warnings.push(`هاتف مكرر — موجود مسبقًا (${dup.reference_no})`);
     }
 
     const values: RowValues = {

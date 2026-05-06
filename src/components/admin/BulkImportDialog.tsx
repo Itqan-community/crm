@@ -137,6 +137,14 @@ export function BulkImportDialog({
 
   // ---------- Preview / validation ----------
 
+  // Lifted out of the `validatedRows` memo: the dup-index only depends on
+  // the server-provided list, so we don't want to rebuild it every time
+  // the operator types into the referral text field below.
+  const duplicateIndex = useMemo(
+    () => buildDuplicateIndex(existingRows),
+    [existingRows],
+  );
+
   const validatedRows = useMemo<ValidatedRow[]>(() => {
     if (!parsed) return [];
     if (mappingErrors.length > 0) return [];
@@ -144,9 +152,9 @@ export function BulkImportDialog({
       defaultChannel,
       defaultReferral: defaultReferral.trim() || null,
       categories,
-      duplicateIndex: buildDuplicateIndex(existingRows),
+      duplicateIndex,
     });
-  }, [parsed, mapping, mappingErrors, defaultChannel, defaultReferral, categories, existingRows]);
+  }, [parsed, mapping, mappingErrors, defaultChannel, defaultReferral, categories, duplicateIndex]);
 
   const counts = useMemo(() => {
     let ok = 0, warning = 0, error = 0;
@@ -192,7 +200,7 @@ export function BulkImportDialog({
   };
 
   return (
-    <DialogShell onClose={onClose} size="3xl">
+    <DialogShell onClose={onClose} size="wide">
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-[16px] font-semibold">{stepTitle[step]}</h3>
         <StepDots step={step} />

@@ -2,33 +2,27 @@
 
 import type { ReactNode } from 'react';
 
-type Size = 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl';
-
-// Tailwind needs the full class string at build time, so we map to literals
-// rather than interpolating `max-w-${size}`.
-const SIZE_TO_CLASS: Record<Size, string> = {
-  md: 'max-w-md',
-  lg: 'max-w-lg',
-  xl: 'max-w-xl',
-  '2xl': 'max-w-2xl',
-  '3xl': 'max-w-3xl',
-  '4xl': 'max-w-4xl',
-};
+// Two widths: 'sm' for short forms (status edit, manual entry, etc.) and
+// 'wide' for table-bearing wizards (bulk import). Add more only when an
+// actual caller needs them — Tailwind needs the literal class string at
+// build time, so a wider enum just means more dead code.
+type Size = 'sm' | 'wide';
 
 export function DialogShell({
   children,
   onClose,
-  size = 'md',
+  size = 'sm',
 }: {
   children: ReactNode;
   onClose: () => void;
   size?: Size;
 }) {
+  const widthClass = size === 'wide' ? 'max-w-3xl' : 'max-w-md';
   return (
     <div className="fixed inset-0 z-40 bg-black/30 flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full ${SIZE_TO_CLASS[size]} rounded-2xl p-5 border my-8`}
+        className={`w-full ${widthClass} rounded-2xl p-5 border my-8`}
         style={{ background: 'var(--bg)', borderColor: 'var(--rule)' }}
       >
         {children}
