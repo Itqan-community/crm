@@ -36,6 +36,8 @@ const SERVER_ERRORS_AR: Record<string, string> = {
   invalid_email: 'بريد غير صحيح',
   invalid_phone: 'رقم هاتف غير صحيح',
   invalid_channel: 'قناة المصدر غير صحيحة',
+  category_missing_phone_field:
+    'هذه الفئة لا تتضمن حقل هاتف. أزل رقم الهاتف أو اختر فئة أخرى.',
   unknown_category: 'الفئة غير معروفة',
   unauthenticated: 'يلزم تسجيل الدخول',
   forbidden: 'لا تملك صلاحية الإنشاء',

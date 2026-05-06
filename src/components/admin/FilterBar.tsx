@@ -74,6 +74,7 @@ export function FilterBar({ categories, statuses, team }: Props) {
 }
 
 function Select({
+  label,
   value,
   onChange,
   options,
@@ -83,10 +84,14 @@ function Select({
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
 }) {
+  // The visible filter label is part of the surrounding chrome, not a
+  // <label htmlFor=…> — wire it via aria-label so screen readers still
+  // announce what the control filters by.
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      aria-label={label}
       className="px-3 py-2 rounded-lg border text-[13.5px] outline-none bg-transparent"
       style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}
     >

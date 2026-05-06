@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import type {
@@ -75,6 +75,20 @@ export function AdminListClient({
   const [openImport, setOpenImport] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
+  // One timer at a time. Without clearing, an older 4-second timer from
+  // toast #1 will hide toast #2 prematurely if they land within the
+  // window. Hold the handle in a ref so we can cancel on each new show.
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = (msg: string, ms = 4000) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), ms);
+  };
+  // Clean up if the component unmounts mid-toast.
+  useEffect(() => () => {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+  }, []);
+
   const filtered = useMemo(() => {
     if (!sourceFilter) return rows;
     return rows.filter((r) => r.source.channel === sourceFilter);
@@ -147,8 +161,7 @@ export function AdminListClient({
           onClose={() => setOpenModal(false)}
           onCreated={(refNo) => {
             setOpenModal(false);
-            setToast(`تمت إضافة الطلب ${refNo}.`);
-            window.setTimeout(() => setToast(null), 4000);
+            showToast(`تمت إضافة الطلب ${refNo}.`);
           }}
         />
       )}
@@ -159,8 +172,10 @@ export function AdminListClient({
           existingRows={rows}
           onClose={() => setOpenImport(false)}
           onCreated={(count) => {
-            setToast(`تم استيراد ${count} طلب محليًا — لم تُحفظ في قاعدة البيانات بعد.`);
-            window.setTimeout(() => setToast(null), 5000);
+            showToast(
+              `تم استيراد ${count} طلب محليًا — لم تُحفظ في قاعدة البيانات بعد.`,
+              5000,
+            );
           }}
         />
       )}

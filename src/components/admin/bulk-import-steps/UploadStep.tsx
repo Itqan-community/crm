@@ -23,10 +23,11 @@ export function UploadStep({ parsing, parseError, onPickFile }: Props) {
       >
         <input
           type="file"
-          accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+          accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
           onChange={onPickFile}
           className="hidden"
           id="bulk-import-file-input"
+          disabled={parsing}
         />
         <label
           htmlFor="bulk-import-file-input"

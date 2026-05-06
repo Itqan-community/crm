@@ -8,13 +8,17 @@ import { getPhoneCountries } from '@/lib/phone-countries';
 type Props = {
   value: string;
   onChange: (v: string) => void;
+  /** id forwarded to the underlying <input>, so a parent <label htmlFor=…> can associate. */
+  id?: string;
+  /** aria-label fallback when no visible <label> is associated. */
+  'aria-label'?: string;
 };
 
 // Slim wrapper around react-international-phone tuned for the admin dialog
 // chrome (small font, transparent bg, --rule borders). Stores the value as
 // E.164 and exposes the country flag picker so the user can't enter an
 // out-of-format number.
-export function AdminPhoneInput({ value, onChange }: Props) {
+export function AdminPhoneInput({ value, onChange, id, ...rest }: Props) {
   const countries = useMemo(() => getPhoneCountries('ar'), []);
 
   return (
@@ -25,10 +29,12 @@ export function AdminPhoneInput({ value, onChange }: Props) {
         onChange={onChange}
         countries={countries}
         inputProps={{
+          id,
           dir: 'ltr',
           autoComplete: 'tel',
           name: 'phone',
           inputMode: 'tel',
+          'aria-label': rest['aria-label'],
         }}
       />
       <style jsx global>{`

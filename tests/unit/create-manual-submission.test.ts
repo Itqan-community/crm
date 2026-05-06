@@ -277,6 +277,33 @@ describe('createManualSubmission — input validation', () => {
       'unknown_category',
     );
   });
+
+  it('rejects when phone is provided but the category has no phone field', async () => {
+    // Regression test for CodeRabbit finding: silently dropping the phone
+    // when the category schema lacks a phone field is a data-loss bug.
+    // The orchestrator must throw category_missing_phone_field BEFORE the
+    // submission INSERT so we don't leave an orphan row behind.
+    const ctx = makeSupabase({
+      user: { id: 'user-1' },
+      teamMember: TEAM_MEMBER,
+      category: ACTIVE_CATEGORY,
+      // No phone field in the active fields list.
+      fields: [
+        { id: 'fld-name', key: 'name', label_ar: 'الاسم', label_en: 'Name', semantic_role: 'name' },
+      ],
+    });
+    vi.mocked(createSupabaseServerClient).mockResolvedValue(ctx.supabase as never);
+
+    await expect(
+      createManualSubmission({
+        ...VALID_INPUT,
+        submitter_email: null,
+        submitter_phone: '+966501234567',
+      }),
+    ).rejects.toThrow('category_missing_phone_field');
+    // Critically: the submission INSERT must NOT have happened.
+    expect(ctx.tables.submissions.spy.insertPayloads).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -400,23 +427,11 @@ describe('createManualSubmission — phone & custom answers', () => {
     expect(answers[0].value_text).toMatch(/^\+966/); // E.164, no spaces
   });
 
-  it('skips the phone answer when the category has no phone field', async () => {
-    const ctx = makeSupabase({
-      user: { id: 'user-1' },
-      teamMember: TEAM_MEMBER,
-      category: ACTIVE_CATEGORY,
-      fields: [],
-    });
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(ctx.supabase as never);
-
-    await createManualSubmission({
-      ...VALID_INPUT,
-      submitter_email: null,
-      submitter_phone: '+966501234567',
-    });
-
-    expect(ctx.tables.submission_answers.spy.insertPayloads).toHaveLength(0);
-  });
+  // The "phone-without-phone-field" failure mode is covered by the
+  // dedicated test in the validation section above (asserts the
+  // category_missing_phone_field throw + that no submission INSERT
+  // happens). The old "silently skip" behaviour was a CodeRabbit-flagged
+  // data-loss bug that the orchestrator now refuses up front.
 
   it('persists non-empty custom answers and skips empty ones', async () => {
     const fields = [

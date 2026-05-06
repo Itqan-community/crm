@@ -12,7 +12,10 @@ export async function parseFile(file: File): Promise<ParsedFile> {
   if (ext === 'csv' || file.type === 'text/csv') {
     return parseCsv(file);
   }
-  if (ext === 'xlsx' || ext === 'xls' || file.type.includes('spreadsheet')) {
+  // read-excel-file v9 only handles .xlsx (OpenXML). Legacy .xls binary
+  // files are not supported — surface that as `unsupported_format` rather
+  // than passing them in and getting a confusing parser error.
+  if (ext === 'xlsx' || file.type.includes('spreadsheetml')) {
     return parseExcel(file);
   }
   throw new Error('unsupported_format');
@@ -60,11 +63,26 @@ function pickSheetMatrix(result: unknown): unknown[][] {
   return Array.isArray(first?.data) ? first.data : [];
 }
 
-function matrixToParsed(filename: string, matrix: string[][]): ParsedFile {
+// Exported for unit tests so we can exercise empty-header / row-count /
+// trim behaviour without spinning up a real File. Production callers
+// reach this through parseFile(); using it directly is a test concern.
+export function matrixToParsed(filename: string, matrix: string[][]): ParsedFile {
   if (matrix.length === 0) {
     throw new Error('empty_file');
   }
-  const headers = (matrix[0] ?? []).map((h) => h.trim()).filter((h) => h.length > 0);
+  const rawHeaders = (matrix[0] ?? []).map((h) => h.trim());
+  // Reject mid-row empty headers up front — silently dropping them would
+  // misalign every subsequent column ("['Name', '', 'Email']" → "['Name',
+  // 'Email']" with the wrong cell mapping). Trailing empties are fine
+  // (Excel pads them) so we only flag empties followed by a non-empty.
+  const lastNonEmpty = rawHeaders.reduce(
+    (acc, h, i) => (h.length > 0 ? i : acc),
+    -1,
+  );
+  for (let i = 0; i < lastNonEmpty; i += 1) {
+    if (rawHeaders[i].length === 0) throw new Error('empty_header_column');
+  }
+  const headers = rawHeaders.filter((h) => h.length > 0);
   if (headers.length === 0) {
     throw new Error('no_headers');
   }

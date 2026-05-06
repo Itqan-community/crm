@@ -34,6 +34,8 @@ const PARSE_ERRORS_AR: Record<string, string> = {
   unsupported_format: 'صيغة الملف غير مدعومة. اختر CSV أو Excel.',
   empty_file: 'الملف فارغ.',
   no_headers: 'الصف الأول يجب أن يحتوي أسماء الأعمدة.',
+  empty_header_column:
+    'صف العناوين يحتوي عمودًا فارغًا في الوسط. أزل العمود أو أكمل عنوانه ثم حاول مجددًا.',
   no_data_rows: 'لا توجد بيانات بعد صف العناوين.',
   too_many_rows: `تجاوزت الحد الأقصى للسطور (${MAX_IMPORT_ROWS}).`,
 };
@@ -157,14 +159,19 @@ export function BulkImportDialog({
   const onSubmit = () => {
     const accepted = validatedRows.filter((r) => r.status !== 'error');
     const skipped = counts.error;
-    console.log('[bulk import — FE only, no DB write]', {
-      filename: parsed?.filename,
-      defaultChannel,
-      defaultReferral: defaultReferral.trim() || null,
-      mapping,
-      accepted_rows: accepted.map((r) => r.values),
-      skipped_count: skipped,
-    });
+    // PII (name/email/phone) must never reach a production console — even
+    // for admin-only flows it widens the privacy/compliance surface
+    // (CodeRabbit-flagged). Dev gets the full payload for shape verification.
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[bulk import — FE only, no DB write]', {
+        filename: parsed?.filename,
+        defaultChannel,
+        defaultReferral: defaultReferral.trim() || null,
+        mapping,
+        accepted_rows: accepted.map((r) => r.values),
+        skipped_count: skipped,
+      });
+    }
     setSubmittedSummary({ ok: accepted.length, skipped });
     setStep('done');
     onCreated(accepted.length);

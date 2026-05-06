@@ -198,16 +198,19 @@ async function insertSubmissionRow(
 // (if provided) goes against the category's phone field, matching the
 // public-form path. Custom answers are filtered: empties drop, and the
 // reserved semantic roles (name/email/phone) are handled separately.
+//
+// `phoneField` is resolved upstream by `requirePhoneFieldIfNeeded`
+// before INSERT, so if it's null we know phoneE164 is also null.
 function buildAnswerRows(
   submissionId: string,
   fields: FormFieldRow[],
   phoneE164: string | null,
+  phoneField: FormFieldRow | null,
   customAnswers: ManualSubmissionInput['custom_answers'],
 ): AnswerInsert[] {
   const rows: AnswerInsert[] = [];
   const RESERVED = new Set(['name', 'email', 'phone']);
 
-  const phoneField = fields.find((f) => f.semantic_role === 'phone');
   if (phoneE164 && phoneField) {
     rows.push({
       submission_id: submissionId,
@@ -256,6 +259,20 @@ async function seedFirstNote(
   if (error) console.error('[createManualSubmission] note insert failed', error);
 }
 
+// Resolve the category's active phone field if the operator typed a
+// phone. Throwing here (BEFORE the submission INSERT) is what makes the
+// phone-required-but-not-supported case a clean failure instead of
+// silently dropping the digits the operator just typed.
+function requirePhoneFieldIfNeeded(
+  fields: FormFieldRow[],
+  phoneE164: string | null,
+): FormFieldRow | null {
+  if (!phoneE164) return null;
+  const phoneField = fields.find((f) => f.semantic_role === 'phone');
+  if (!phoneField) throw new Error('category_missing_phone_field');
+  return phoneField;
+}
+
 // Orchestrator. Each step throws a stable error code on failure that the
 // modal's translateError() turns into Arabic for the operator.
 export async function createManualSubmission(
@@ -264,12 +281,16 @@ export async function createManualSubmission(
   const { supabase, member } = await requireTeam();
   const cleaned = validateManualInput(input);
   const fields = await loadActiveCategoryFields(supabase, input.category_id);
+  // Validate phone-vs-category compatibility BEFORE INSERT so a missing
+  // phone field doesn't leave behind an orphan submission.
+  const phoneField = requirePhoneFieldIfNeeded(fields, cleaned.phoneE164);
   const inserted = await insertSubmissionRow(supabase, input, cleaned);
 
   const answerRows = buildAnswerRows(
     inserted.id,
     fields,
     cleaned.phoneE164,
+    phoneField,
     input.custom_answers,
   );
   if (answerRows.length > 0) {
