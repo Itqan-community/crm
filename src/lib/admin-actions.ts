@@ -3,11 +3,21 @@
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from './supabase/server';
 import { EMAIL_REGEX, parsePhoneSmart } from './validation';
+import { SOURCE_CHANNELS } from './source-channels';
 import type {
   Lang,
   SourceChannelKey,
   SubmissionSource,
 } from '@/types/database';
+
+// Keep the referral note short — it's a hint, not a chat field. Anything
+// longer is almost certainly accidental paste, and we don't want to widen
+// the attack surface for storing arbitrary blobs in jsonb.
+const REFERRAL_MAX_LEN = 500;
+// Notes here are the team's own internal annotation; longer than the
+// referral hint but still capped to keep one POST predictable.
+const NOTES_MAX_LEN = 5000;
+const VALID_CHANNELS = new Set<string>(SOURCE_CHANNELS.map((c) => c.key));
 
 async function requireTeam() {
   const supabase = await createSupabaseServerClient();
@@ -88,6 +98,13 @@ export async function createManualSubmission(input: {
 }): Promise<{ id: string; reference_no: string }> {
   const { supabase, member } = await requireTeam();
 
+  // The TS type says channel is a known key, but TS types don't survive a
+  // network hop — a hand-crafted RPC call could send anything. Guard at
+  // the boundary so we never persist arbitrary strings into source.channel.
+  if (!VALID_CHANNELS.has(input.source.channel)) {
+    throw new Error('invalid_channel');
+  }
+
   const name = input.submitter_name.trim();
   const email = (input.submitter_email ?? '').trim().toLowerCase();
   const phoneRaw = (input.submitter_phone ?? '').trim();
@@ -103,12 +120,14 @@ export async function createManualSubmission(input: {
     phoneE164 = r.e164;
   }
 
-  // Pull the category's active fields so we can snapshot labels alongside
-  // the answers — same pattern the public /api/submissions route uses.
+  // Active categories only — listing the inactive ones in the modal is a
+  // bug, but a stale tab could still ship the old id. Surface the same
+  // user-facing error in either case.
   const { data: catRow, error: catErr } = await supabase
     .from('form_categories')
     .select('id, is_active')
     .eq('id', input.category_id)
+    .eq('is_active', true)
     .maybeSingle();
   if (catErr) throw new Error(catErr.message);
   if (!catRow) throw new Error('unknown_category');
@@ -121,9 +140,10 @@ export async function createManualSubmission(input: {
   if (fieldsErr) throw new Error(fieldsErr.message);
   const fields = fieldsData ?? [];
 
+  const referralTrimmed = input.source.referral?.trim() ?? '';
   const source: SubmissionSource = {
     channel: input.source.channel,
-    referral: input.source.referral?.trim() || null,
+    referral: referralTrimmed ? referralTrimmed.slice(0, REFERRAL_MAX_LEN) : null,
   };
 
   const { data: inserted, error: subErr } = await supabase
@@ -202,13 +222,18 @@ export async function createManualSubmission(input: {
     }
   }
 
-  const noteBody = input.notes?.trim();
+  const noteBody = input.notes?.trim().slice(0, NOTES_MAX_LEN);
   if (noteBody) {
-    await supabase.from('notes').insert({
+    // Notes are best-effort — the submission itself already exists and the
+    // operator can re-add the note later from the detail page if this
+    // insert fails. We log to the server so a systemic note-write outage
+    // is visible without making the whole flow brittle.
+    const { error: noteErr } = await supabase.from('notes').insert({
       submission_id: inserted.id,
       author_id: member.id,
       body: noteBody,
     });
+    if (noteErr) console.error('[createManualSubmission] note insert failed', noteErr);
   }
 
   revalidatePath('/admin');

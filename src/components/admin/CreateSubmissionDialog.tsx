@@ -36,6 +36,7 @@ const SERVER_ERRORS_AR: Record<string, string> = {
   contact_required: 'أدخل البريد أو رقم الهاتف على الأقل',
   invalid_email: 'بريد غير صحيح',
   invalid_phone: 'رقم هاتف غير صحيح',
+  invalid_channel: 'قناة المصدر غير صحيحة',
   unknown_category: 'الفئة غير معروفة',
   unauthenticated: 'يلزم تسجيل الدخول',
   forbidden: 'لا تملك صلاحية الإنشاء',
