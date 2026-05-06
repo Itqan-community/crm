@@ -5,6 +5,7 @@ import { createSupabaseServerClient } from './supabase/server';
 import { EMAIL_REGEX, parsePhoneSmart } from './validation';
 import { isValidChannelKey } from './source-channels';
 import type {
+  FormFieldRow,
   Lang,
   SourceChannelKey,
   SubmissionSource,
@@ -79,12 +80,7 @@ export async function setSubmissionAssignee(submissionId: string, assigneeId: st
   revalidatePath('/admin');
 }
 
-// Used by the manual-entry modal. Inserts a submission with the chosen
-// source (channel + referral note), persists any category-specific custom
-// answers, and — if the team member typed something into the notes field —
-// posts that as the first internal note (which the existing trigger logs
-// as a `note_added` activity automatically).
-export async function createManualSubmission(input: {
+type ManualSubmissionInput = {
   category_id: string;
   language: Lang;
   submitter_name: string;
@@ -94,12 +90,29 @@ export async function createManualSubmission(input: {
   // field_id -> value entered in the modal for that custom field
   custom_answers: Record<string, string | string[] | null>;
   notes: string | null;
-}): Promise<{ id: string; reference_no: string }> {
-  const { supabase, member } = await requireTeam();
+};
 
-  // The TS type says channel is a known key, but TS types don't survive a
-  // network hop — a hand-crafted RPC call could send anything. Guard at
-  // the boundary so we never persist arbitrary strings into source.channel.
+// Reusable shape for one row about to land in submission_answers.
+type AnswerInsert = {
+  submission_id: string;
+  field_id: string;
+  field_key_snap: string;
+  field_label_snap: { ar: string; en: string };
+  value_text: string | null;
+  value_json: unknown;
+};
+
+type CleanedInput = {
+  name: string;
+  email: string;
+  phoneE164: string | null;
+  source: SubmissionSource;
+};
+
+// Validate + normalise client input. Throws with a stable error code on
+// the first violation so the modal's translateError() can render Arabic.
+// `channel` is the only field whose TS type doesn't survive the wire.
+function validateManualInput(input: ManualSubmissionInput): CleanedInput {
   if (!isValidChannelKey(input.source.channel)) {
     throw new Error('invalid_channel');
   }
@@ -119,74 +132,85 @@ export async function createManualSubmission(input: {
     phoneE164 = r.e164;
   }
 
-  // Active categories only — listing the inactive ones in the modal is a
-  // bug, but a stale tab could still ship the old id. Surface the same
-  // user-facing error in either case.
-  const { data: catRow, error: catErr } = await supabase
-    .from('form_categories')
-    .select('id, is_active')
-    .eq('id', input.category_id)
-    .eq('is_active', true)
-    .maybeSingle();
-  if (catErr) throw new Error(catErr.message);
-  if (!catRow) throw new Error('unknown_category');
-
-  const { data: fieldsData, error: fieldsErr } = await supabase
-    .from('form_fields')
-    .select('*')
-    .eq('category_id', input.category_id)
-    .eq('is_active', true);
-  if (fieldsErr) throw new Error(fieldsErr.message);
-  const fields = fieldsData ?? [];
-
   const referralTrimmed = input.source.referral?.trim() ?? '';
   const source: SubmissionSource = {
     channel: input.source.channel,
     referral: referralTrimmed ? referralTrimmed.slice(0, REFERRAL_MAX_LEN) : null,
   };
 
-  const { data: inserted, error: subErr } = await supabase
+  return { name, email, phoneE164, source };
+}
+
+// Confirm the category exists AND is active, then return its active
+// fields. A stale browser tab could ship a deactivated id; surface the
+// same `unknown_category` code in either case.
+async function loadActiveCategoryFields(
+  supabase: Awaited<ReturnType<typeof requireTeam>>['supabase'],
+  category_id: string,
+): Promise<FormFieldRow[]> {
+  const { data: catRow, error: catErr } = await supabase
+    .from('form_categories')
+    .select('id, is_active')
+    .eq('id', category_id)
+    .eq('is_active', true)
+    .maybeSingle();
+  if (catErr) throw new Error(catErr.message);
+  if (!catRow) throw new Error('unknown_category');
+
+  const { data, error } = await supabase
+    .from('form_fields')
+    .select('*')
+    .eq('category_id', category_id)
+    .eq('is_active', true);
+  if (error) throw new Error(error.message);
+  return (data ?? []) as FormFieldRow[];
+}
+
+// Map 0042 hasn't run yet → SELECT/INSERT against `source` returns 42703.
+// Translate it once at the boundary so callers don't need to know the
+// Postgres error code.
+async function insertSubmissionRow(
+  supabase: Awaited<ReturnType<typeof requireTeam>>['supabase'],
+  input: ManualSubmissionInput,
+  cleaned: CleanedInput,
+): Promise<{ id: string; reference_no: string }> {
+  const { data, error } = await supabase
     .from('submissions')
     .insert({
       category_id: input.category_id,
       language: input.language,
-      submitter_name: name,
-      submitter_email: email,
+      submitter_name: cleaned.name,
+      submitter_email: cleaned.email,
       newsletter_optin: false,
-      source,
+      source: cleaned.source,
     })
     .select('id, reference_no')
     .single();
 
-  if (subErr || !inserted) {
-    // 42703 = undefined column. Migration 0011 (which adds `source`)
-    // hasn't been applied to this Supabase project yet. Surface a clear
-    // code so the modal can show a friendly Arabic message instead of a
-    // raw Postgres error.
-    if (subErr?.code === '42703') throw new Error('migration_required');
-    throw new Error(subErr?.message ?? 'submission_insert_failed');
+  if (error || !data) {
+    if (error?.code === '42703') throw new Error('migration_required');
+    throw new Error(error?.message ?? 'submission_insert_failed');
   }
+  return data;
+}
 
-  // Phone gets stored as an answer against the category's phone field
-  // (matching the public-form path). If the category has no phone field
-  // we silently skip — the operator entered a phone we don't have a
-  // canonical slot for.
+// Build the answer-row array for a freshly-inserted submission. Phone
+// (if provided) goes against the category's phone field, matching the
+// public-form path. Custom answers are filtered: empties drop, and the
+// reserved semantic roles (name/email/phone) are handled separately.
+function buildAnswerRows(
+  submissionId: string,
+  fields: FormFieldRow[],
+  phoneE164: string | null,
+  customAnswers: ManualSubmissionInput['custom_answers'],
+): AnswerInsert[] {
+  const rows: AnswerInsert[] = [];
+  const RESERVED = new Set(['name', 'email', 'phone']);
+
   const phoneField = fields.find((f) => f.semantic_role === 'phone');
-
-  type AnswerInsert = {
-    submission_id: string;
-    field_id: string;
-    field_key_snap: string;
-    field_label_snap: { ar: string; en: string };
-    value_text: string | null;
-    value_json: unknown;
-  };
-
-  const answerRows: AnswerInsert[] = [];
-
   if (phoneE164 && phoneField) {
-    answerRows.push({
-      submission_id: inserted.id,
+    rows.push({
+      submission_id: submissionId,
       field_id: phoneField.id,
       field_key_snap: phoneField.key,
       field_label_snap: { ar: phoneField.label_ar, en: phoneField.label_en },
@@ -196,12 +220,12 @@ export async function createManualSubmission(input: {
   }
 
   for (const f of fields) {
-    if (['name', 'email', 'phone'].includes(f.semantic_role ?? '')) continue;
-    const v = input.custom_answers[f.id];
+    if (RESERVED.has(f.semantic_role ?? '')) continue;
+    const v = customAnswers[f.id];
     const isEmpty = v == null || v === '' || (Array.isArray(v) && v.length === 0);
     if (isEmpty) continue;
-    answerRows.push({
-      submission_id: inserted.id,
+    rows.push({
+      submission_id: submissionId,
       field_id: f.id,
       field_key_snap: f.key,
       field_label_snap: { ar: f.label_ar, en: f.label_en },
@@ -210,33 +234,57 @@ export async function createManualSubmission(input: {
     });
   }
 
+  return rows;
+}
+
+// Notes are best-effort — the submission already exists, and the
+// operator can re-add later from the detail page. Log to the server so
+// a systemic note-write outage stays visible.
+async function seedFirstNote(
+  supabase: Awaited<ReturnType<typeof requireTeam>>['supabase'],
+  submissionId: string,
+  authorId: string,
+  body: string | null,
+): Promise<void> {
+  const trimmed = body?.trim().slice(0, NOTES_MAX_LEN);
+  if (!trimmed) return;
+  const { error } = await supabase.from('notes').insert({
+    submission_id: submissionId,
+    author_id: authorId,
+    body: trimmed,
+  });
+  if (error) console.error('[createManualSubmission] note insert failed', error);
+}
+
+// Orchestrator. Each step throws a stable error code on failure that the
+// modal's translateError() turns into Arabic for the operator.
+export async function createManualSubmission(
+  input: ManualSubmissionInput,
+): Promise<{ id: string; reference_no: string }> {
+  const { supabase, member } = await requireTeam();
+  const cleaned = validateManualInput(input);
+  const fields = await loadActiveCategoryFields(supabase, input.category_id);
+  const inserted = await insertSubmissionRow(supabase, input, cleaned);
+
+  const answerRows = buildAnswerRows(
+    inserted.id,
+    fields,
+    cleaned.phoneE164,
+    input.custom_answers,
+  );
   if (answerRows.length > 0) {
-    const { error: ansErr } = await supabase
-      .from('submission_answers')
-      .insert(answerRows);
-    if (ansErr) {
-      // Best-effort cleanup so we don't leave a half-built row behind.
+    const { error } = await supabase.from('submission_answers').insert(answerRows);
+    if (error) {
+      // Cleanup so we don't leave a half-built row behind. Activity log
+      // entries cascade-delete via the FK.
       await supabase.from('submissions').delete().eq('id', inserted.id);
-      throw new Error(ansErr.message);
+      throw new Error(error.message);
     }
   }
 
-  const noteBody = input.notes?.trim().slice(0, NOTES_MAX_LEN);
-  if (noteBody) {
-    // Notes are best-effort — the submission itself already exists and the
-    // operator can re-add the note later from the detail page if this
-    // insert fails. We log to the server so a systemic note-write outage
-    // is visible without making the whole flow brittle.
-    const { error: noteErr } = await supabase.from('notes').insert({
-      submission_id: inserted.id,
-      author_id: member.id,
-      body: noteBody,
-    });
-    if (noteErr) console.error('[createManualSubmission] note insert failed', noteErr);
-  }
-
+  await seedFirstNote(supabase, inserted.id, member.id, input.notes);
   revalidatePath('/admin');
-  return { id: inserted.id, reference_no: inserted.reference_no };
+  return inserted;
 }
 
 export async function addNote(submissionId: string, body: string) {
