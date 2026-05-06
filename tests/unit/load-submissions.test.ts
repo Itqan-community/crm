@@ -177,6 +177,29 @@ describe('loadSubmissions — other filters still work alongside', () => {
     expect(neqCalls).toEqual([{ method: 'neq', args: ['status_id', 'archived-uuid'] }]);
   });
 
+  it('escapes ilike meta-characters AND the escape character itself in `q`', async () => {
+    // Regression test for CodeQL js/incomplete-sanitization. The previous
+    // pattern only escaped % and _; a backslash in the search input would
+    // pass through unchanged and could re-enable the wildcards we just
+    // escaped (e.g. user types `\%` → pattern becomes `\\%` which ilike
+    // interprets as "literal backslash + match anything"). Verify all
+    // three meta characters are now escaped.
+    const ctx = makeSupabase({ archivedStatusId: 'archived-uuid' });
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: ctx.from } as never);
+
+    await loadSubmissions({ q: '50% off \\ test_user' });
+
+    const orCalls = ctx.submissionsQuery.calls.filter((c) => c.method === 'or');
+    const orArg = orCalls[0].args[0] as string;
+    // Every ilike pattern in the OR string should contain the escaped forms.
+    expect(orArg).toContain('50\\% off');
+    expect(orArg).toContain('\\\\'); // the user's `\` got escaped to `\\`
+    expect(orArg).toContain('test\\_user');
+    // And NOT the unescaped meta characters in their search-string positions
+    // (they only appear as the surrounding %... wildcards we add ourselves).
+    expect(orArg).not.toMatch(/50%\s/); // the `%` in the input was escaped
+  });
+
   it('always applies order(created_at desc) and limit(200)', async () => {
     const ctx = makeSupabase({});
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: ctx.from } as never);

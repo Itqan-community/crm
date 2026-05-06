@@ -70,7 +70,11 @@ export async function loadSubmissions(filters: SubmissionFilters): Promise<Submi
     else if (filters.assignee) q = q.eq('assignee_id', filters.assignee);
 
     if (filters.q) {
-      const pattern = `%${filters.q.trim().replace(/[%_]/g, '\\$&')}%`;
+      // Escape PostgREST ilike meta-characters AND the escape character
+      // itself. Without escaping `\`, a user-supplied string containing a
+      // backslash (or following a `%` we just escaped) flips meaning of
+      // subsequent characters — flagged by CodeQL `js/incomplete-sanitization`.
+      const pattern = `%${filters.q.trim().replace(/[\\%_]/g, '\\$&')}%`;
       q = q.or(
         `submitter_name.ilike.${pattern},submitter_email.ilike.${pattern},reference_no.ilike.${pattern}`,
       );
