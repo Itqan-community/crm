@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
+import dynamic from 'next/dynamic';
 import type {
   FormCategoryRow,
   FormFieldRow,
@@ -14,6 +15,14 @@ import { ViewToggle, type AdminView } from './ViewToggle';
 import { KanbanBoard } from './KanbanBoard';
 import { SubmissionsTable } from './SubmissionsTable';
 import { CreateSubmissionDialog } from './CreateSubmissionDialog';
+
+// The bulk-import wizard pulls in papaparse + read-excel-file (~80 kB
+// gzipped together). Defer its load until the operator actually clicks
+// the import button so first-paint /admin stays light.
+const BulkImportDialog = dynamic(
+  () => import('./BulkImportDialog').then((m) => ({ default: m.BulkImportDialog })),
+  { ssr: false },
+);
 
 type Props = {
   view: AdminView;
@@ -45,6 +54,7 @@ export function AdminListClient({
   const sourceFilter = sp.get('source') ?? '';
 
   const [openModal, setOpenModal] = useState(false);
+  const [openImport, setOpenImport] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
@@ -62,6 +72,15 @@ export function AdminListClient({
           </span>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setOpenImport(true)}
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border text-[13px] transition"
+            style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}
+          >
+            <span aria-hidden="true">⇪</span>
+            <span>استيراد ملف</span>
+          </button>
           <button
             type="button"
             onClick={() => setOpenModal(true)}
@@ -106,6 +125,17 @@ export function AdminListClient({
           setOpenModal(false);
           setToast(`تمت إضافة الطلب ${refNo}.`);
           window.setTimeout(() => setToast(null), 4000);
+        }}
+      />
+
+      <BulkImportDialog
+        open={openImport}
+        categories={activeCategories}
+        existingRows={rows}
+        onClose={() => setOpenImport(false)}
+        onCreated={(count) => {
+          setToast(`تم استيراد ${count} طلب محليًا — لم تُحفظ في قاعدة البيانات بعد.`);
+          window.setTimeout(() => setToast(null), 5000);
         }}
       />
     </div>
