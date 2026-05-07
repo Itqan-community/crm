@@ -10,14 +10,25 @@ import { UI, pick } from './i18n';
 // addresses authoritatively.
 export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-const AR_EN_DIGITS: Record<string, string> = {
+const AR_DIGITS: Record<string, string> = {
   '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
+};
+const FA_DIGITS: Record<string, string> = {
   '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9',
 };
 
+// Single source of truth for Arabic-Indic digit conversion. Used by the OTP
+// input directly and composed with Persian digit conversion inside
+// normalizePhoneInput — the phone field is the only consumer that also needs
+// Persian digits.
+export function normalizeArabicDigits(raw: string): string {
+  if (!raw) return '';
+  return String(raw).replace(/[٠-٩]/g, (d) => AR_DIGITS[d] ?? d);
+}
+
 export function normalizePhoneInput(raw: string): string {
   if (!raw) return '';
-  let s = String(raw).replace(/[٠-٩۰-۹]/g, (d) => AR_EN_DIGITS[d] || d);
+  let s = normalizeArabicDigits(raw).replace(/[۰-۹]/g, (d) => FA_DIGITS[d] ?? d);
   s = s.replace(/[^\d+\s\-()]/g, '');
   const hasPlus = s.trim().startsWith('+');
   s = s.replace(/\+/g, '');

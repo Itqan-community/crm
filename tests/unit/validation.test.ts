@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   EMAIL_REGEX,
+  normalizeArabicDigits,
   normalizePhoneInput,
   parsePhoneSmart,
   validateField,
@@ -41,6 +42,27 @@ describe('EMAIL_REGEX', () => {
     ['', false],
   ])('matches %s -> %s', (input, expected) => {
     expect(EMAIL_REGEX.test(input)).toBe(expected);
+  });
+});
+
+describe('normalizeArabicDigits', () => {
+  it('converts pure Arabic-Indic digits', () => {
+    expect(normalizeArabicDigits('٢٠٢٦٤١')).toBe('202641');
+  });
+  it('passes through Latin digits unchanged', () => {
+    expect(normalizeArabicDigits('202641')).toBe('202641');
+  });
+  it('converts mixed Arabic and Latin digits', () => {
+    expect(normalizeArabicDigits('٢02٦4١')).toBe('202641');
+  });
+  it('leaves Persian digits untouched', () => {
+    expect(normalizeArabicDigits('۲۰۲۶۴۱')).toBe('۲۰۲۶۴۱');
+  });
+  it('returns empty for empty input', () => {
+    expect(normalizeArabicDigits('')).toBe('');
+  });
+  it('preserves non-digit characters', () => {
+    expect(normalizeArabicDigits('abc-٢٠٢')).toBe('abc-202');
   });
 });
 
