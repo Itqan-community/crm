@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import { createSupabaseAdminClient } from '@/lib/supabase/admin';
-import { EMAIL_REGEX } from '@/lib/validation';
+import { EMAIL_REGEX, normalizeArabicDigits } from '@/lib/validation';
 
 // Server-side OTP verification. Client posts {email, token}; we exchange
 // with Supabase, gate on allowed_emails, and bootstrap the team_members
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   }
 
   const email = body.email?.trim().toLowerCase();
-  const token = body.token?.trim();
+  const token = normalizeArabicDigits(body.token?.trim() ?? '');
   if (!email || !EMAIL_REGEX.test(email)) {
     return NextResponse.json({ error: 'invalid_email' }, { status: 400 });
   }

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { normalizeArabicDigits } from '@/lib/validation';
 
 type Step = 'email' | 'code' | 'success';
 
@@ -98,7 +99,7 @@ export function LoginForm({ next, initialError }: { next?: string; initialError?
           required
           placeholder="123456"
           value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+          onChange={(e) => setCode(normalizeArabicDigits(e.target.value).replace(/\D/g, '').slice(0, 6))}
           dir="ltr"
           className="w-full px-4 py-3 rounded-lg border-2 outline-none text-[20px] font-mono tracking-[0.5em] text-center bg-transparent transition-colors"
           style={{ color: 'var(--fg)', borderColor: error ? 'var(--danger)' : 'var(--rule)' }}
