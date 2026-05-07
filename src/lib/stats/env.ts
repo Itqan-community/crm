@@ -40,10 +40,13 @@ export function sourceConfigured(source: StatsSource): boolean {
     case 'github':
       return Boolean(STATS_ENV.GITHUB_PAT || STATS_ENV.GITHUB_PAT_2);
     case 'analytics':
+      // PROPERTY_ID is required to actually run reports — without it
+      // we can't pick a target property, so treat it as unconfigured.
       return Boolean(
         STATS_ENV.GA_OAUTH_CLIENT_ID &&
           STATS_ENV.GA_OAUTH_CLIENT_SECRET &&
-          STATS_ENV.GA_OAUTH_REFRESH_TOKEN,
+          STATS_ENV.GA_OAUTH_REFRESH_TOKEN &&
+          STATS_ENV.GA_PROPERTY_ID,
       );
     case 'forum':
       return Boolean(STATS_ENV.FLARUM_DB_URL);

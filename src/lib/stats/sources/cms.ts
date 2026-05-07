@@ -92,7 +92,7 @@ export async function getCms(): Promise<CmsMetrics | null> {
     };
   } catch (err) {
     console.warn('[stats:cms] fetch failed:', describeError(err));
-    return null;
+    throw err;
   } finally {
     try {
       await client.end();

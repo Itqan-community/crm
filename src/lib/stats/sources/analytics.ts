@@ -35,14 +35,9 @@ export async function getAnalytics(opts: {
   if (
     !STATS_ENV.GA_OAUTH_CLIENT_ID ||
     !STATS_ENV.GA_OAUTH_CLIENT_SECRET ||
-    !STATS_ENV.GA_OAUTH_REFRESH_TOKEN
+    !STATS_ENV.GA_OAUTH_REFRESH_TOKEN ||
+    !STATS_ENV.GA_PROPERTY_ID
   ) {
-    return null;
-  }
-  if (!STATS_ENV.GA_PROPERTY_ID) {
-    console.warn(
-      '[stats:analytics] stat_app_GA_PROPERTY_ID missing — set it to the GA4 numeric property id for itqan.dev',
-    );
     return null;
   }
 
@@ -139,7 +134,7 @@ export async function getAnalytics(opts: {
     };
   } catch (err) {
     console.warn('[stats:analytics] fetch failed:', describeError(err));
-    return null;
+    throw err;
   }
 }
 

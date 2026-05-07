@@ -95,7 +95,7 @@ export async function getNewsletter(): Promise<NewsletterMetrics | null> {
     };
   } catch (err) {
     console.warn('[stats:newsletter] fetch failed:', describeError(err));
-    return null;
+    throw err;
   }
 }
 

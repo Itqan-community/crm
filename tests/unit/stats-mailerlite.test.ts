@@ -99,12 +99,11 @@ describe('getNewsletter', () => {
     expect(r!.recentCampaigns).toHaveLength(2);
   });
 
-  it('returns null on non-200 response — no throw', async () => {
+  it('throws on non-200 — loader will record the error message', async () => {
     vi.stubEnv('mailerlite_API_KEY', 'ml_test');
     stubFetch(() => new Response('bad token', { status: 401 }));
     const { getNewsletter } = await import('@/lib/stats/sources/mailerlite');
-    const r = await getNewsletter();
-    expect(r).toBeNull();
+    await expect(getNewsletter()).rejects.toThrow(/MailerLite.*401/);
   });
 
   it('skips campaigns with sent=0 from the average', async () => {

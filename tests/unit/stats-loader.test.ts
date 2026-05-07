@@ -66,13 +66,15 @@ describe('loadStatsBundle', () => {
     expect(b.errors).toEqual([]); // unconfigured ≠ error
   });
 
-  it('records an error when a configured source returns null', async () => {
-    vi.stubEnv('mailerlite_API_KEY', 'ml_x'); // newsletter is now configured
-    mockAllNull(); // but the mock returns null
+  it('treats null as "not configured" and does not raise an error', async () => {
+    // Even with the env var set, a source that returns null is treated
+    // as unconfigured (its own contract: throw to signal failure).
+    vi.stubEnv('mailerlite_API_KEY', 'ml_x');
+    mockAllNull();
     const { loadStatsBundle } = await import('@/lib/stats/loader');
     const b = await loadStatsBundle();
-    expect(b.errors).toHaveLength(1);
-    expect(b.errors[0].source).toBe('newsletter');
+    expect(b.errors).toEqual([]);
+    expect(b.newsletter).toBeNull();
   });
 
   it('isolates a thrown source — others still resolve', async () => {

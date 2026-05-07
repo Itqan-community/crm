@@ -93,7 +93,7 @@ export async function getForum(opts: {
     };
   } catch (err) {
     console.warn('[stats:forum] fetch failed:', describeError(err));
-    return null;
+    throw err;
   } finally {
     if (conn) {
       try {

@@ -7,7 +7,7 @@
 // (low traffic, the COUNTs are cheap). When traffic grows we'll wrap
 // the loader in `unstable_cache` with the same 5-minute TTL.
 
-import { sourceConfigured, type StatsSource } from './env';
+import { type StatsSource } from './env';
 import { getNewsletter } from './sources/mailerlite';
 import { getGithub } from './sources/github';
 import { getAnalytics } from './sources/analytics';
@@ -58,20 +58,14 @@ export async function loadStatsBundle(
     'quranApps',
     'cms',
   ];
+  // Sources are designed so that:
+  //   - null  → not configured (env vars missing) — silent, surfaces in env banner
+  //   - throw → configured but the call failed — captured here with the real error
   const errors: StatsBundle['errors'] = [];
   const values = settled.map((r, i) => {
     if (r.status === 'rejected') {
       errors.push({ source: sources[i], message: describeError(r.reason) });
       return null;
-    }
-    // A null result from a configured source means the source threw and
-    // returned null silently. Surface that as an error too — but only
-    // when configured, so unconfigured sources don't pollute the banner.
-    if (r.value === null && sourceConfigured(sources[i])) {
-      errors.push({
-        source: sources[i],
-        message: 'returned null (check server logs)',
-      });
     }
     return r.value;
   });

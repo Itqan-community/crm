@@ -68,7 +68,7 @@ export async function getQuranApps(): Promise<QuranAppsMetrics | null> {
     };
   } catch (err) {
     console.warn('[stats:quranApps] fetch failed:', describeError(err));
-    return null;
+    throw err;
   } finally {
     try {
       await client.end();

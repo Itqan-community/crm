@@ -93,7 +93,7 @@ export async function getGithub(opts: { range: DateRange }): Promise<GithubMetri
     };
   } catch (err) {
     console.warn('[stats:github] fetch failed:', describeError(err));
-    return null;
+    throw err;
   }
 }
 
