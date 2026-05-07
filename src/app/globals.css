@@ -194,3 +194,99 @@ button:active:not(:disabled) {
    hover; Next button uses :active brightness via the global rule above. */
 .form-nav-back:hover:not(:disabled) { color: var(--fg); }
 .form-nav-next:hover:not(:disabled) { filter: brightness(0.95); }
+
+/* ---- Dashboard tokens + atoms ----
+   Chart colors stay constant across themes so legends/breakdowns read the
+   same regardless of the picked accent. --accent-soft is per-theme since
+   it derives from --accent. */
+:root {
+  --gold:    #946E52;
+  --warn:    #C9883B;
+  --success: #2F7A4F;
+  --info:    #3D6B8C;
+}
+:root[data-theme="olive"] { --accent-soft: rgba(27,67,50,0.08); }
+:root[data-theme="paper"] { --accent-soft: rgba(45,45,45,0.06); }
+:root[data-theme="gold"]  { --accent-soft: rgba(148,110,82,0.10); }
+:root[data-theme="deep"]  { --accent-soft: rgba(212,180,131,0.14); }
+
+.glass {
+  background: rgba(255,255,255,0.55);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid var(--rule-soft);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.7) inset, 0 8px 24px -16px rgba(27,67,50,0.18);
+}
+.glass-deep {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid var(--rule-soft);
+}
+
+.num        { font-variant-numeric: tabular-nums; font-feature-settings: "tnum"; }
+.dot        { width: 6px; height: 6px; border-radius: 50%; display: inline-block; }
+.delta-up   { color: var(--success); }
+.delta-down { color: var(--danger); }
+.delta-flat { color: var(--muted); }
+
+.seg {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--accent-soft);
+  border: 1px solid var(--rule-soft);
+  border-radius: 10px;
+}
+.seg button {
+  padding: 6px 12px;
+  border-radius: 7px;
+  font-size: 12.5px;
+  font-weight: 500;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: inherit;
+}
+.seg button[aria-pressed="true"] {
+  background: rgba(255,255,255,0.95);
+  color: var(--fg);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+.dash-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--rule);
+  background: rgba(255,255,255,0.6);
+  color: var(--fg);
+  cursor: pointer;
+  transition: all .18s ease;
+}
+.dash-btn:hover { background: rgba(255,255,255,0.9); }
+.dash-btn-primary {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border-color: var(--accent);
+}
+.dash-btn-primary:hover { filter: brightness(1.08); }
+
+/* Responsive grids — design is desktop-first (1400×1080) but the cards
+   stack on tablets/phones so the dashboard stays usable on smaller
+   viewports. */
+.dash-grid-hero      { display: grid; grid-template-columns: 1fr 1.4fr; gap: 24px; align-items: end; }
+.dash-grid-community { display: grid; grid-template-columns: 1.1fr 1fr 1fr; gap: 14px; margin-bottom: 22px; }
+.dash-grid-platform  { display: grid; grid-template-columns: 1fr 1fr 1.2fr 1fr; gap: 14px; }
+@media (max-width: 1100px) {
+  .dash-grid-platform  { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 768px) {
+  .dash-grid-hero      { grid-template-columns: 1fr; }
+  .dash-grid-community { grid-template-columns: 1fr; }
+  .dash-grid-platform  { grid-template-columns: 1fr; }
+}
