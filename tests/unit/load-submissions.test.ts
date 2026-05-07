@@ -177,6 +177,29 @@ describe('loadSubmissions — other filters still work alongside', () => {
     expect(neqCalls).toEqual([{ method: 'neq', args: ['status_id', 'archived-uuid'] }]);
   });
 
+  it('escapes ilike meta-characters AND the escape character itself in `q`', async () => {
+    // Regression test for CodeQL js/incomplete-sanitization. The previous
+    // pattern only escaped % and _; a backslash in the search input would
+    // pass through unchanged and could re-enable the wildcards we just
+    // escaped (e.g. user types `\%` → pattern becomes `\\%` which ilike
+    // interprets as "literal backslash + match anything"). Verify all
+    // three meta characters are now escaped.
+    const ctx = makeSupabase({ archivedStatusId: 'archived-uuid' });
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: ctx.from } as never);
+
+    await loadSubmissions({ q: '50% off \\ test_user' });
+
+    const orCalls = ctx.submissionsQuery.calls.filter((c) => c.method === 'or');
+    const orArg = orCalls[0].args[0] as string;
+    // Every ilike pattern in the OR string should contain the escaped forms.
+    expect(orArg).toContain('50\\% off');
+    expect(orArg).toContain('\\\\'); // the user's `\` got escaped to `\\`
+    expect(orArg).toContain('test\\_user');
+    // And NOT the unescaped meta characters in their search-string positions
+    // (they only appear as the surrounding %... wildcards we add ourselves).
+    expect(orArg).not.toMatch(/50%\s/); // the `%` in the input was escaped
+  });
+
   it('always applies order(created_at desc) and limit(200)', async () => {
     const ctx = makeSupabase({});
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: ctx.from } as never);
@@ -199,5 +222,108 @@ describe('loadSubmissions — error propagation', () => {
     vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: ctx.from } as never);
 
     await expect(loadSubmissions({})).rejects.toThrow('rls denied');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Pre-migration fallback: when migration 0011 hasn't been applied to the
+// Supabase project yet, the SELECT for `source` returns 42703. We retry
+// without that column and stamp every row with the public-form default,
+// so /admin keeps rendering during the deploy gap.
+// ---------------------------------------------------------------------------
+
+describe('loadSubmissions — source-column fallback', () => {
+  function makeFallbackSupabase(opts: {
+    firstResult: { data: unknown; error: unknown };
+    secondResult: { data: unknown; error: unknown };
+  }) {
+    const submissionsCalls: { method: string; args: unknown[] }[] = [];
+    let attempt = 0;
+
+    const buildSubmissionsChain = () => {
+      const c: Record<string, unknown> = {};
+      const track = (method: string) => (...args: unknown[]) => {
+        submissionsCalls.push({ method, args });
+        return c;
+      };
+      for (const m of ['select', 'order', 'limit', 'eq', 'neq', 'is', 'or']) {
+        c[m] = track(m);
+      }
+      const result = attempt === 0 ? opts.firstResult : opts.secondResult;
+      attempt += 1;
+      c.then = (resolve: (v: unknown) => unknown, reject: (v: unknown) => unknown) =>
+        Promise.resolve(result).then(resolve, reject);
+      return c;
+    };
+
+    const statusesQuery = makeQuery({
+      maybeSingle: { data: { id: 'archived-uuid' }, error: null },
+    });
+
+    const fromSpy = vi.fn((table: string) => {
+      if (table === 'submissions') return buildSubmissionsChain();
+      if (table === 'statuses') return statusesQuery.chain;
+      throw new Error(`unexpected table: ${table}`);
+    });
+    return { from: fromSpy, submissionsCalls, getAttempts: () => attempt };
+  }
+
+  it('retries without `source` and defaults the channel to "form" on 42703', async () => {
+    const ctx = makeFallbackSupabase({
+      firstResult: {
+        data: null,
+        error: { code: '42703', message: 'column "source" does not exist' },
+      },
+      secondResult: {
+        data: [
+          { id: 'a', reference_no: 'ITQ-1', submitter_name: 'A', submitter_email: 'a@x.x' },
+          { id: 'b', reference_no: 'ITQ-2', submitter_name: 'B', submitter_email: 'b@x.x' },
+        ],
+        error: null,
+      },
+    });
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: ctx.from } as never);
+
+    const rows = await loadSubmissions({});
+
+    expect(ctx.getAttempts()).toBe(2);
+    expect(rows).toHaveLength(2);
+    for (const r of rows) {
+      expect(r.source).toEqual({ channel: 'form', referral: null });
+    }
+  });
+
+  it('does NOT retry on a non-42703 error — rls denials still surface', async () => {
+    const ctx = makeFallbackSupabase({
+      firstResult: { data: null, error: { code: '42501', message: 'rls denied' } },
+      secondResult: { data: [], error: null }, // never read
+    });
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: ctx.from } as never);
+
+    await expect(loadSubmissions({})).rejects.toThrow('rls denied');
+    expect(ctx.getAttempts()).toBe(1);
+  });
+
+  it('uses a single SELECT (no fallback) once the migration is applied', async () => {
+    const ctx = makeFallbackSupabase({
+      firstResult: {
+        data: [
+          {
+            id: 'a',
+            reference_no: 'ITQ-1',
+            submitter_name: 'A',
+            submitter_email: 'a@x.x',
+            source: { channel: 'phone', referral: null },
+          },
+        ],
+        error: null,
+      },
+      secondResult: { data: [], error: null }, // never read
+    });
+    vi.mocked(createSupabaseServerClient).mockResolvedValue({ from: ctx.from } as never);
+
+    const rows = await loadSubmissions({});
+    expect(ctx.getAttempts()).toBe(1);
+    expect(rows[0].source).toEqual({ channel: 'phone', referral: null });
   });
 });

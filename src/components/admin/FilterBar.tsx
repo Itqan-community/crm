@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useTransition } from 'react';
 import type { FormCategoryRow, StatusRow, TeamMemberRow } from '@/types/database';
+import { SOURCE_CHANNELS } from '@/lib/source-channels';
 
 type Props = {
   categories: FormCategoryRow[];
@@ -44,6 +45,11 @@ export function FilterBar({ categories, statuses, team }: Props) {
                 { value: 'unassigned', label: 'بدون مسؤول' },
                 ...team.map((t) => ({ value: t.id, label: t.full_name || t.email })),
               ]} />
+      <Select label="المصدر" value={sp.get('source') ?? ''} onChange={(v) => update('source', v)}
+              options={[
+                { value: '', label: 'كل المصادر' },
+                ...SOURCE_CHANNELS.map((c) => ({ value: c.key, label: `${c.icon}  ${c.label_ar}` })),
+              ]} />
       <label
         className="inline-flex items-center gap-2 px-3 py-2 rounded-lg border text-[13.5px] cursor-pointer select-none"
         style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}
@@ -68,6 +74,7 @@ export function FilterBar({ categories, statuses, team }: Props) {
 }
 
 function Select({
+  label,
   value,
   onChange,
   options,
@@ -77,10 +84,14 @@ function Select({
   onChange: (v: string) => void;
   options: { value: string; label: string }[];
 }) {
+  // The visible filter label is part of the surrounding chrome, not a
+  // <label htmlFor=…> — wire it via aria-label so screen readers still
+  // announce what the control filters by.
   return (
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      aria-label={label}
       className="px-3 py-2 rounded-lg border text-[13.5px] outline-none bg-transparent"
       style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}
     >

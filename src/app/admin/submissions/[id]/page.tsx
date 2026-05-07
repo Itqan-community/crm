@@ -7,7 +7,8 @@ import { AssigneePicker } from '@/components/admin/AssigneePicker';
 import { NotesPanel } from '@/components/admin/NotesPanel';
 import { ActivityFeed } from '@/components/admin/ActivityFeed';
 import { LocalTime } from '@/components/admin/LocalTime';
-import type { Bilingual } from '@/types/database';
+import { SourceBadge } from '@/components/admin/SourceBadge';
+import type { Bilingual, SubmissionSource } from '@/types/database';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,6 +27,7 @@ type SubmissionDetail = {
   newsletter_optin: boolean;
   submitter_name: string;
   submitter_email: string;
+  source: SubmissionSource;
   category: CategoryRef | null;
   status: StatusRef | null;
   assignee: AuthorRef | null;
@@ -64,25 +66,30 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/admin/login');
 
+  // First-pass select asks for `source`; if migration 0011 hasn't run yet
+  // Postgres returns 42703 and we retry without it, defaulting source to
+  // the public-form channel so the page still renders.
+  const SUB_BASE_COLS = `id, reference_no, language, created_at, updated_at, status_id, assignee_id, newsletter_optin,
+    submitter_name, submitter_email,
+    category:form_categories(id, key, label_ar, label_en),
+    status:statuses(id, key, label_ar, label_en, color),
+    assignee:team_members(id, email, full_name)`;
+
+  const subWithSource = supabase
+    .from('submissions')
+    .select(SUB_BASE_COLS.replace('newsletter_optin,', 'newsletter_optin, source,'))
+    .eq('id', id)
+    .maybeSingle();
+
   const [
-    { data: subData },
+    subResult,
     { data: answersData },
     { data: notesData },
     { data: activityData },
     statuses,
     team,
   ] = await Promise.all([
-    supabase
-      .from('submissions')
-      .select(
-        `id, reference_no, language, created_at, updated_at, status_id, assignee_id, newsletter_optin,
-         submitter_name, submitter_email,
-         category:form_categories(id, key, label_ar, label_en),
-         status:statuses(id, key, label_ar, label_en, color),
-         assignee:team_members(id, email, full_name)`,
-      )
-      .eq('id', id)
-      .maybeSingle(),
+    subWithSource,
     // Pull the originating field's position in the same query, so we can
     // restore the form's authoring order without a follow-up roundtrip.
     supabase
@@ -103,8 +110,24 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
     loadTeam(),
   ]);
 
-  if (!subData) notFound();
-  const sub = subData as unknown as SubmissionDetail;
+  let sub: SubmissionDetail | null = null;
+  if (!subResult.error) {
+    sub = subResult.data as unknown as SubmissionDetail | null;
+  } else if (subResult.error.code === '42703') {
+    const fb = await supabase
+      .from('submissions')
+      .select(SUB_BASE_COLS)
+      .eq('id', id)
+      .maybeSingle();
+    if (fb.error) throw new Error(fb.error.message);
+    sub = fb.data
+      ? ({ ...fb.data, source: { channel: 'form', referral: null } } as unknown as SubmissionDetail)
+      : null;
+  } else {
+    throw new Error(subResult.error.message);
+  }
+
+  if (!sub) notFound();
   const answers = (answersData ?? []) as unknown as AnswerRow[];
   const notes = (notesData ?? []) as unknown as NoteRow[];
   const activity = (activityData ?? []) as unknown as ActivityRow[];
@@ -151,6 +174,15 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
               <FieldRow label="البريد" value={sub.submitter_email} dir="ltr" />
               <FieldRow label="اللغة" value={sub.language === 'ar' ? 'العربية' : 'English'} />
               <FieldRow label="نشرة إتقان" value={sub.newsletter_optin ? 'مشترك' : 'لا'} />
+              <div>
+                <dt className="text-[12px] font-medium uppercase tracking-wider mb-1" style={{ color: 'var(--muted)' }}>المصدر</dt>
+                <dd className="flex flex-wrap items-center gap-2">
+                  <SourceBadge source={sub.source} />
+                  {sub.source.referral && (
+                    <span style={{ color: 'var(--muted)' }}>· {sub.source.referral}</span>
+                  )}
+                </dd>
+              </div>
             </dl>
           </section>
 

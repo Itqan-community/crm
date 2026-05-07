@@ -1,3 +1,5 @@
+import { Tag } from './Tag';
+
 type Props = { label: string; categoryKey: string };
 
 const PALETTE = [
@@ -18,17 +20,5 @@ function colorFor(key: string): string {
 }
 
 export function CategoryBadge({ label, categoryKey }: Props) {
-  const color = colorFor(categoryKey);
-  return (
-    <span
-      className="inline-flex items-center px-2 py-0.5 rounded-md text-[12px] font-medium border"
-      style={{
-        color,
-        borderColor: color + '40',
-        background: color + '14',
-      }}
-    >
-      {label}
-    </span>
-  );
+  return <Tag color={colorFor(categoryKey)}>{label}</Tag>;
 }
