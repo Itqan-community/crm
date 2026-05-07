@@ -13,10 +13,11 @@ type Item = {
 };
 
 const ITEMS: Item[] = [
-  { href: '/admin',                       label: 'الطلبات',          icon: InboxIcon,    adminOnly: false },
-  { href: '/admin/stats',                 label: 'البيانات',          icon: BarChartIcon, adminOnly: false },
-  { href: '/admin/settings',              label: 'الحالات والفريق', icon: UsersIcon,    adminOnly: true  },
-  { href: '/admin/settings/form-builder', label: 'بناء النموذج',    icon: WrenchIcon,   adminOnly: true  },
+  { href: '/admin',                       label: 'اللوحة',           icon: DashboardIcon, adminOnly: false },
+  { href: '/admin/submissions',           label: 'الطلبات',          icon: InboxIcon,     adminOnly: false },
+  { href: '/admin/stats',                 label: 'البيانات الخام',  icon: BarChartIcon,  adminOnly: false },
+  { href: '/admin/settings',              label: 'الحالات والفريق', icon: UsersIcon,     adminOnly: true  },
+  { href: '/admin/settings/form-builder', label: 'بناء النموذج',    icon: WrenchIcon,    adminOnly: true  },
 ];
 
 const STORAGE_KEY = 'itqan_sidebar_collapsed';
@@ -124,6 +125,17 @@ function CollapseIcon({ flipped }: { flipped: boolean }) {
       style={{ transform: flipped ? 'rotate(180deg)' : 'none', transition: 'transform 200ms' }}>
       <path d="M9 6l-6 6 6 6" />
       <path d="M21 6l-6 6 6 6" />
+    </svg>
+  );
+}
+
+function DashboardIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
     </svg>
   );
 }
