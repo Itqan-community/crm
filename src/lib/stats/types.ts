@@ -12,30 +12,41 @@ export type ChangeMetric = {
 
 // ---- Newsletter (MailerLite) -------------------------------------------------
 
+export type NewsletterCampaignRow = {
+  id: string;
+  name: string;
+  subject: string;
+  sentAt: string | null;
+  sent: number;
+  opens: number;
+  clicks: number;
+  openRate: number; // 0..100
+  clickRate: number; // 0..100
+};
+
 export type NewsletterMetrics = {
   // Active subscribers as MailerLite reports them (the unique-people
   // count, not the daily activity).
   activeSubscribers: number;
-  // Sent campaigns considered for the open/click averages.
-  sampledCampaigns: number;
-  // Average across the most recent N sent campaigns (0..100).
-  avgOpenRate: number;
-  avgClickRate: number;
-  // Last sent campaign in the sample, for "freshness" display.
-  lastCampaignAt: string | null;
-  lastCampaignName: string | null;
-  // Per-campaign rows from the most recent sent campaigns (newest first).
-  recentCampaigns: Array<{
-    id: string;
-    name: string;
-    subject: string;
-    sentAt: string | null;
-    sent: number;
-    opens: number;
-    clicks: number;
-    openRate: number;
-    clickRate: number;
-  }>;
+
+  // Most recently sent campaign — its OWN open/click rate, not an
+  // average. Null when no sent campaigns exist.
+  lastCampaign: NewsletterCampaignRow | null;
+
+  // Rolling 7-day window: open/click averages across every campaign
+  // sent in the last 7 days, plus how many fell in that window.
+  // count=0 means we have no campaigns to average — UI must show "—".
+  last7Days: {
+    count: number;
+    totalSent: number;
+    avgOpenRate: number;
+    avgClickRate: number;
+  };
+
+  // Last N sent campaigns (newest first) — used as a fallback for the
+  // "average open rate" KPI when last7Days.count is 0, and so the UI
+  // can show a per-campaign list if desired.
+  recentCampaigns: NewsletterCampaignRow[];
 };
 
 // ---- GitHub ------------------------------------------------------------------

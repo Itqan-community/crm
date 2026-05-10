@@ -42,20 +42,27 @@ describe('getNewsletter', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('averages open/click rates across the sampled campaigns', async () => {
+  it('separates lastCampaign from the last-7-days window average', async () => {
     vi.stubEnv('mailerlite_API_KEY', 'ml_test');
+    // Two recent (within 7d) + one old (>7d) campaign. The old one
+    // should NOT contribute to last7Days but SHOULD appear in
+    // recentCampaigns.
+    const now = Date.now();
+    const day = 24 * 60 * 60 * 1000;
+    const oneHourAgo = new Date(now - 60 * 60 * 1000).toISOString();
+    const threeDaysAgo = new Date(now - 3 * day).toISOString();
+    const twentyDaysAgo = new Date(now - 20 * day).toISOString();
+
     stubFetch((path) => {
-      if (path.startsWith('/subscribers')) {
-        return jsonResponse({ total: 1234, data: [] });
-      }
+      if (path.startsWith('/subscribers')) return jsonResponse({ total: 1234 });
       if (path.startsWith('/campaigns')) {
         return jsonResponse({
           data: [
             {
               id: 'c1',
-              name: 'Latest issue',
+              name: 'النشرة الحادية والعشرون',
               subject: 'Hello',
-              finished_at: '2026-05-01T10:00:00Z',
+              finished_at: oneHourAgo,
               scheduled_for: null,
               stats: {
                 sent: 1000,
@@ -67,9 +74,9 @@ describe('getNewsletter', () => {
             },
             {
               id: 'c2',
-              name: 'Older issue',
+              name: 'النشرة العشرون',
               subject: 'Hi',
-              finished_at: '2026-04-15T10:00:00Z',
+              finished_at: threeDaysAgo,
               scheduled_for: null,
               stats: {
                 sent: 800,
@@ -77,6 +84,20 @@ describe('getNewsletter', () => {
                 unique_clicks_count: 40,
                 open_rate: { float: 0.3 },
                 click_rate: { float: 0.05 },
+              },
+            },
+            {
+              id: 'c3',
+              name: 'النشرة التاسعة عشر',
+              subject: 'Old',
+              finished_at: twentyDaysAgo,
+              scheduled_for: null,
+              stats: {
+                sent: 500,
+                unique_opens_count: 100,
+                unique_clicks_count: 10,
+                open_rate: { float: 0.2 },
+                click_rate: { float: 0.02 },
               },
             },
           ],
@@ -89,14 +110,57 @@ describe('getNewsletter', () => {
     const r = await getNewsletter();
     expect(r).not.toBeNull();
     expect(r!.activeSubscribers).toBe(1234);
-    expect(r!.sampledCampaigns).toBe(2);
+
+    // lastCampaign = the newest (regardless of window).
+    expect(r!.lastCampaign?.id).toBe('c1');
+    expect(r!.lastCampaign?.name).toBe('النشرة الحادية والعشرون');
+    expect(r!.lastCampaign?.openRate).toBeCloseTo(40, 5);
+    expect(r!.lastCampaign?.clickRate).toBeCloseTo(8, 5);
+
+    // last7Days = only c1 + c2 (c3 is 20 days old).
+    expect(r!.last7Days.count).toBe(2);
+    expect(r!.last7Days.totalSent).toBe(1800);
     // (0.4 + 0.3) / 2 * 100 = 35.0
-    expect(r!.avgOpenRate).toBeCloseTo(35, 5);
+    expect(r!.last7Days.avgOpenRate).toBeCloseTo(35, 5);
     // (0.08 + 0.05) / 2 * 100 = 6.5
-    expect(r!.avgClickRate).toBeCloseTo(6.5, 5);
-    expect(r!.lastCampaignName).toBe('Latest issue');
-    expect(r!.lastCampaignAt).toBe('2026-05-01T10:00:00Z');
-    expect(r!.recentCampaigns).toHaveLength(2);
+    expect(r!.last7Days.avgClickRate).toBeCloseTo(6.5, 5);
+
+    // recentCampaigns has all 3, newest first.
+    expect(r!.recentCampaigns).toHaveLength(3);
+    expect(r!.recentCampaigns[0].id).toBe('c1');
+    expect(r!.recentCampaigns[2].id).toBe('c3');
+  });
+
+  it('returns last7Days with count=0 when no campaign falls in the window', async () => {
+    vi.stubEnv('mailerlite_API_KEY', 'ml_test');
+    const longAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    stubFetch((path) => {
+      if (path.startsWith('/subscribers')) return jsonResponse({ total: 100 });
+      return jsonResponse({
+        data: [
+          {
+            id: 'c1',
+            name: 'Old',
+            subject: '',
+            finished_at: longAgo,
+            scheduled_for: null,
+            stats: {
+              sent: 200,
+              unique_opens_count: 50,
+              unique_clicks_count: 5,
+              open_rate: { float: 0.25 },
+              click_rate: { float: 0.025 },
+            },
+          },
+        ],
+      });
+    });
+    const { getNewsletter } = await import('@/lib/stats/sources/mailerlite');
+    const r = await getNewsletter();
+    expect(r!.last7Days.count).toBe(0);
+    expect(r!.last7Days.avgOpenRate).toBe(0);
+    // lastCampaign still set even though it's outside the 7d window.
+    expect(r!.lastCampaign?.id).toBe('c1');
   });
 
   it('throws on non-200 — loader will record the error message', async () => {
@@ -106,32 +170,19 @@ describe('getNewsletter', () => {
     await expect(getNewsletter()).rejects.toThrow(/MailerLite.*401/);
   });
 
-  it('skips campaigns with sent=0 from the average', async () => {
+  it('skips zero-sent campaigns from lastCampaign and last7Days', async () => {
     vi.stubEnv('mailerlite_API_KEY', 'ml_test');
+    const recent = new Date(Date.now() - 60 * 60 * 1000).toISOString();
     stubFetch((path) => {
       if (path.startsWith('/subscribers')) return jsonResponse({ total: 0 });
       return jsonResponse({
         data: [
+          // First in MailerLite's order: a zero-sent draft.
           {
-            id: 'c1',
-            name: 'Sent',
-            subject: '',
-            finished_at: null,
-            scheduled_for: null,
-            stats: {
-              sent: 100,
-              unique_opens_count: 50,
-              unique_clicks_count: 10,
-              open_rate: { float: 0.5 },
-              click_rate: { float: 0.1 },
-            },
-          },
-          // This zero-sent campaign should be ignored in the average.
-          {
-            id: 'c2',
+            id: 'c-draft',
             name: 'Draft',
             subject: '',
-            finished_at: null,
+            finished_at: recent,
             scheduled_for: null,
             stats: {
               sent: 0,
@@ -141,12 +192,29 @@ describe('getNewsletter', () => {
               click_rate: { float: 0 },
             },
           },
+          {
+            id: 'c-real',
+            name: 'Sent',
+            subject: '',
+            finished_at: recent,
+            scheduled_for: null,
+            stats: {
+              sent: 100,
+              unique_opens_count: 50,
+              unique_clicks_count: 10,
+              open_rate: { float: 0.5 },
+              click_rate: { float: 0.1 },
+            },
+          },
         ],
       });
     });
     const { getNewsletter } = await import('@/lib/stats/sources/mailerlite');
     const r = await getNewsletter();
-    expect(r!.sampledCampaigns).toBe(1);
-    expect(r!.avgOpenRate).toBeCloseTo(50, 5);
+    // lastCampaign skips the zero-sent draft.
+    expect(r!.lastCampaign?.id).toBe('c-real');
+    // last7Days averages only the real campaign.
+    expect(r!.last7Days.count).toBe(1);
+    expect(r!.last7Days.avgOpenRate).toBeCloseTo(50, 5);
   });
 });

@@ -45,15 +45,12 @@ export async function getAnalytics(opts: {
   }
 
   // Lazy-load googleapis so unconfigured environments don't pay the
-  // import cost on cold start.
+  // import cost on cold start. If the import itself fails the
+  // environment IS configured but unusable — throw so the loader
+  // surfaces the exact reason in the error banner instead of letting
+  // the row show "—" with no explanation.
   type GoogleApis = typeof import('googleapis');
-  let google: GoogleApis['google'];
-  try {
-    ({ google } = (await import('googleapis')) as GoogleApis);
-  } catch (err) {
-    console.warn('[stats:analytics] googleapis import failed:', describeError(err));
-    return null;
-  }
+  const { google } = (await import('googleapis')) as GoogleApis;
 
   try {
     const oauth2 = new google.auth.OAuth2(

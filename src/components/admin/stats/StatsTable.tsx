@@ -62,21 +62,52 @@ function buildSections(b: StatsBundle): Section[] {
     subtitle: 'الوصول والتفاعل عبر القنوات الرئيسية',
     rows: [
       {
-        label: 'معدّل فتح النشرة',
-        value: pctOrDash(b.newsletter?.avgOpenRate),
-        source: `MailerLite — متوسط آخر ${b.newsletter?.sampledCampaigns ?? 0} حملة`,
+        label: 'معدّل فتح آخر حملة',
+        value: pctOrDash(b.newsletter?.lastCampaign?.openRate),
+        source: b.newsletter?.lastCampaign
+          ? `MailerLite — ${b.newsletter.lastCampaign.name} (${dateOrDash(b.newsletter.lastCampaign.sentAt)})`
+          : 'MailerLite — لا توجد حملات مرسلة',
         alternatives: [
           {
-            label: 'معدّل النقر',
-            value: pctOrDash(b.newsletter?.avgClickRate),
+            label: 'معدّل النقر لآخر حملة',
+            value: pctOrDash(b.newsletter?.lastCampaign?.clickRate),
             source: 'MailerLite',
           },
           {
-            label: 'آخر حملة',
-            value:
-              b.newsletter?.lastCampaignName
-                ? `${b.newsletter.lastCampaignName} (${dateOrDash(b.newsletter.lastCampaignAt)})`
-                : '—',
+            label: 'عدد المرسَل إليهم',
+            value: intOrDash(b.newsletter?.lastCampaign?.sent),
+            source: 'MailerLite',
+          },
+          {
+            label: 'فتحات فريدة',
+            value: intOrDash(b.newsletter?.lastCampaign?.opens),
+            source: 'MailerLite',
+          },
+        ],
+      },
+      {
+        label: 'متوسط فتح النشرة (آخر 7 أيام)',
+        value: b.newsletter && b.newsletter.last7Days.count > 0
+          ? pctOrDash(b.newsletter.last7Days.avgOpenRate)
+          : '—',
+        source: b.newsletter
+          ? `MailerLite — ${b.newsletter.last7Days.count} ${b.newsletter.last7Days.count === 1 ? 'حملة' : 'حملات'} في النافذة`
+          : 'MailerLite',
+        note:
+          b.newsletter && b.newsletter.last7Days.count === 0
+            ? 'لا حملات مرسلة في الأسبوع الماضي — لا يمكن حساب متوسط'
+            : undefined,
+        alternatives: [
+          {
+            label: 'متوسط النقر (آخر 7 أيام)',
+            value: b.newsletter && b.newsletter.last7Days.count > 0
+              ? pctOrDash(b.newsletter.last7Days.avgClickRate)
+              : '—',
+            source: 'MailerLite',
+          },
+          {
+            label: 'إجمالي المرسَل في النافذة',
+            value: intOrDash(b.newsletter?.last7Days.totalSent),
             source: 'MailerLite',
           },
         ],
