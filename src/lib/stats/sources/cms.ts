@@ -35,16 +35,21 @@ export async function getCms(): Promise<CmsMetrics | null> {
     return null;
   }
 
-  // Same as quran_apps.ts: defer SSL to the connection string so the
-  // pg client matches stats's `new Pool({ connectionString })` defaults.
-  // The previous forced-SSL config was masking the real failure as a
-  // 10s timeout. Add `?sslmode=require` to the URL if encryption is
-  // required for this DB.
+  // CMS prod DB requires TLS — Django enforces it via
+  // `OPTIONS: { "sslmode": "require" }` in
+  // config/settings/production.py. Without ssl on the pg side the
+  // handshake stalls until our connection timeout fires (the
+  // server is waiting for a TLS ClientHello that never arrives).
+  // rejectUnauthorized:false matches `sslmode=require` (encrypt but
+  // don't verify the cert chain) — Django's setting doesn't pin a CA
+  // either.
+  // Quran Apps DB takes the opposite default — see quran_apps.ts.
   const client = new pg.Client({
     connectionString: STATS_ENV.CMS_DB_URL,
-    statement_timeout: 15_000,
-    query_timeout: 15_000,
-    connectionTimeoutMillis: 15_000,
+    statement_timeout: 30_000,
+    query_timeout: 30_000,
+    connectionTimeoutMillis: 30_000,
+    ssl: { rejectUnauthorized: false },
   });
 
   try {
