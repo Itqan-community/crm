@@ -133,11 +133,36 @@ export async function getAnalytics(opts: {
       })),
     };
   } catch (err) {
-    console.warn('[stats:analytics] fetch failed:', describeError(err));
+    const detail = describeError(err);
+    console.warn('[stats:analytics] fetch failed:', detail);
+    // `invalid_client` from Google means the (client_id, client_secret)
+    // pair doesn't match a registered OAuth client. Surface a non-secret
+    // fingerprint of what we actually sent so the user can compare with
+    // the values that work in stats's Railway deployment.
+    if (detail.includes('invalid_client')) {
+      throw new Error(
+        `${detail} — credentials sent: client_id=${fingerprint(STATS_ENV.GA_OAUTH_CLIENT_ID)} (${(STATS_ENV.GA_OAUTH_CLIENT_ID ?? '').length} chars), client_secret length=${(STATS_ENV.GA_OAUTH_CLIENT_SECRET ?? '').length}, refresh_token length=${(STATS_ENV.GA_OAUTH_REFRESH_TOKEN ?? '').length}. Compare these against the values in Railway → stats.`,
+      );
+    }
     throw err;
   }
 }
 
 function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
+  if (!err) return 'unknown';
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'object' && err !== null) {
+    const obj = err as Record<string, unknown>;
+    return String(obj.message ?? obj.error ?? JSON.stringify(obj).slice(0, 300));
+  }
+  return String(err);
+}
+
+// Show the first 6 + last 4 characters of a credential so the user can
+// diff it against the canonical value in Railway without exposing it
+// in full. Returns "(empty)" if the value is missing.
+function fingerprint(value: string | undefined): string {
+  if (!value) return '(empty)';
+  if (value.length <= 12) return `${value.slice(0, 4)}…${value.slice(-2)}`;
+  return `${value.slice(0, 6)}…${value.slice(-4)}`;
 }
