@@ -1,34 +1,20 @@
 // Google Analytics 4 source — itqan.dev pageviews / visitors / sessions.
 //
 // Authentication: OAuth2 refresh-token flow, same shape as stats's
-// analytics collector. The Itqan GA4 property IDs are well-known
-// (they ride on every page in the GA tracking snippet) so we hardcode
-// them here — same approach stats takes in
-// src/app/api/setup/ga-properties/route.ts (the DEFAULT_PROPERTIES
-// constant). Avoids forcing every deploy to set a numeric env var.
+// analytics collector. Property IDs come from env (one per site)
+// rather than being hardcoded — the four GA_PROPERTY_ID_* vars in
+// Vercel mirror what stats stores in its AnalyticsProperty table.
 //
-// `stat_app_GA_PROPERTY_ID` still works as an override if you want to
-// point this at a different property without code changes.
+// This source currently reports on itqan.dev only (the
+// user-requested "زيارات itqan.dev" KPI). The other three property
+// ids are read from env but unused — kept available so a follow-up
+// can expose per-site breakdowns without touching env config.
 //
 // We compare current-window vs previous-window so the table can show
 // a delta. GA Data API supports two `dateRanges` in one call.
 
 import { STATS_ENV } from '../env';
 import type { AnalyticsMetrics, ChangeMetric, DateRange } from '../types';
-
-// GA4 property IDs for the Itqan estate. These are public values
-// (visible in any of these sites' tracking snippets) — not secrets.
-// Mirrors stats's DEFAULT_PROPERTIES list.
-const ITQAN_GA_PROPERTIES = {
-  itqanLanding: '481677039', // itqan.dev — the user-asked KPI
-  cms: '518600697', // cms.itqan.dev
-  community: '518403346', // community.itqan.dev (Flarum forum)
-  quranApps: '481625748', // quran-apps.itqan.dev
-} as const;
-
-function resolvePropertyId(): string {
-  return STATS_ENV.GA_PROPERTY_ID || ITQAN_GA_PROPERTIES.itqanLanding;
-}
 
 function isoDay(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -52,7 +38,8 @@ export async function getAnalytics(opts: {
   if (
     !STATS_ENV.GA_OAUTH_CLIENT_ID ||
     !STATS_ENV.GA_OAUTH_CLIENT_SECRET ||
-    !STATS_ENV.GA_OAUTH_REFRESH_TOKEN
+    !STATS_ENV.GA_OAUTH_REFRESH_TOKEN ||
+    !STATS_ENV.GA_PROPERTY_ID_itqan_dev
   ) {
     return null;
   }
@@ -76,7 +63,7 @@ export async function getAnalytics(opts: {
     oauth2.setCredentials({ refresh_token: STATS_ENV.GA_OAUTH_REFRESH_TOKEN });
 
     const data = google.analyticsdata({ version: 'v1beta', auth: oauth2 });
-    const property = `properties/${resolvePropertyId()}`;
+    const property = `properties/${STATS_ENV.GA_PROPERTY_ID_itqan_dev}`;
 
     const cur = { startDate: isoDay(opts.range.start), endDate: isoDay(opts.range.end) };
     const prev = previousWindow(opts.range);

@@ -16,7 +16,14 @@ export const STATS_ENV = {
   GA_OAUTH_CLIENT_ID: process.env.stat_app_GA_OAUTH_CLIENT_ID,
   GA_OAUTH_CLIENT_SECRET: process.env.stat_app_GA_OAUTH_CLIENT_SECRET,
   GA_OAUTH_REFRESH_TOKEN: process.env.stat_app_GA_OAUTH_REFRESH_TOKEN,
-  GA_PROPERTY_ID: process.env.stat_app_GA_PROPERTY_ID,
+
+  // GA4 numeric property IDs per Itqan site. The names are not
+  // secrets (visible in each site's tracking snippet) but storing
+  // them as env vars keeps the code agnostic to property changes.
+  GA_PROPERTY_ID_itqan_dev: process.env.GA_PROPERTY_ID_itqan_dev,
+  GA_PROPERTY_ID_cms_itqan_dev: process.env.GA_PROPERTY_ID_cms_itqan_dev,
+  GA_PROPERTY_ID_community_itqan_dev: process.env.GA_PROPERTY_ID_community_itqan_dev,
+  GA_PROPERTY_ID_quran_apps_itqan_dev: process.env.GA_PROPERTY_ID_quran_apps_itqan_dev,
 
   FLARUM_DB_URL: process.env.stat_app_FLARUM_DB_URL,
   QURAN_APPS_DB_URL: process.env.stat_app_QURAN_APPS_DATABASE_URL,
@@ -40,13 +47,15 @@ export function sourceConfigured(source: StatsSource): boolean {
     case 'github':
       return Boolean(STATS_ENV.GITHUB_PAT || STATS_ENV.GITHUB_PAT_2);
     case 'analytics':
-      // PROPERTY_ID has a hardcoded default (itqan.dev) inside
-      // sources/analytics.ts, so it's optional — only the OAuth
-      // triple is mandatory.
+      // Need OAuth triple + at least the itqan.dev property id
+      // (the user-asked "زيارات itqan.dev" KPI relies on it).
+      // The other three GA_PROPERTY_ID_* vars are optional today
+      // and ride along for future per-site breakdowns.
       return Boolean(
         STATS_ENV.GA_OAUTH_CLIENT_ID &&
           STATS_ENV.GA_OAUTH_CLIENT_SECRET &&
-          STATS_ENV.GA_OAUTH_REFRESH_TOKEN,
+          STATS_ENV.GA_OAUTH_REFRESH_TOKEN &&
+          STATS_ENV.GA_PROPERTY_ID_itqan_dev,
       );
     case 'forum':
       return Boolean(STATS_ENV.FLARUM_DB_URL);
@@ -76,6 +85,10 @@ export const SOURCE_ENV_NAMES: Record<StatsSource, readonly string[]> = {
     'stat_app_GA_OAUTH_CLIENT_ID',
     'stat_app_GA_OAUTH_CLIENT_SECRET',
     'stat_app_GA_OAUTH_REFRESH_TOKEN',
+    'GA_PROPERTY_ID_itqan_dev',
+    'GA_PROPERTY_ID_cms_itqan_dev (اختياري)',
+    'GA_PROPERTY_ID_community_itqan_dev (اختياري)',
+    'GA_PROPERTY_ID_quran_apps_itqan_dev (اختياري)',
   ] as const,
   forum: ['stat_app_FLARUM_DB_URL'] as const,
   quranApps: ['stat_app_QURAN_APPS_DATABASE_URL'] as const,
