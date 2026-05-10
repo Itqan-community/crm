@@ -40,13 +40,13 @@ export function sourceConfigured(source: StatsSource): boolean {
     case 'github':
       return Boolean(STATS_ENV.GITHUB_PAT || STATS_ENV.GITHUB_PAT_2);
     case 'analytics':
-      // PROPERTY_ID is required to actually run reports — without it
-      // we can't pick a target property, so treat it as unconfigured.
+      // PROPERTY_ID has a hardcoded default (itqan.dev) inside
+      // sources/analytics.ts, so it's optional — only the OAuth
+      // triple is mandatory.
       return Boolean(
         STATS_ENV.GA_OAUTH_CLIENT_ID &&
           STATS_ENV.GA_OAUTH_CLIENT_SECRET &&
-          STATS_ENV.GA_OAUTH_REFRESH_TOKEN &&
-          STATS_ENV.GA_PROPERTY_ID,
+          STATS_ENV.GA_OAUTH_REFRESH_TOKEN,
       );
     case 'forum':
       return Boolean(STATS_ENV.FLARUM_DB_URL);
@@ -76,7 +76,6 @@ export const SOURCE_ENV_NAMES: Record<StatsSource, readonly string[]> = {
     'stat_app_GA_OAUTH_CLIENT_ID',
     'stat_app_GA_OAUTH_CLIENT_SECRET',
     'stat_app_GA_OAUTH_REFRESH_TOKEN',
-    'stat_app_GA_PROPERTY_ID (مطلوب لقراءة إحصاءات itqan.dev)',
   ] as const,
   forum: ['stat_app_FLARUM_DB_URL'] as const,
   quranApps: ['stat_app_QURAN_APPS_DATABASE_URL'] as const,

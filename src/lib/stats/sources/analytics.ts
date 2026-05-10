@@ -1,17 +1,34 @@
 // Google Analytics 4 source — itqan.dev pageviews / visitors / sessions.
 //
-// Authentication: OAuth2 refresh-token flow, the same shape stats's
-// analytics collector uses. We don't list properties — we expect a
-// single configured property id (stat_app_GA_PROPERTY_ID). If the
-// admin needs to choose, that's a Phase 2 enhancement; for now one
-// property is enough since itqan.dev is the only thing we report on
-// from this source.
+// Authentication: OAuth2 refresh-token flow, same shape as stats's
+// analytics collector. The Itqan GA4 property IDs are well-known
+// (they ride on every page in the GA tracking snippet) so we hardcode
+// them here — same approach stats takes in
+// src/app/api/setup/ga-properties/route.ts (the DEFAULT_PROPERTIES
+// constant). Avoids forcing every deploy to set a numeric env var.
 //
-// We ALSO compare current-window vs previous-window so the table can
-// show a delta. GA Data API supports two `dateRanges` in one call.
+// `stat_app_GA_PROPERTY_ID` still works as an override if you want to
+// point this at a different property without code changes.
+//
+// We compare current-window vs previous-window so the table can show
+// a delta. GA Data API supports two `dateRanges` in one call.
 
 import { STATS_ENV } from '../env';
 import type { AnalyticsMetrics, ChangeMetric, DateRange } from '../types';
+
+// GA4 property IDs for the Itqan estate. These are public values
+// (visible in any of these sites' tracking snippets) — not secrets.
+// Mirrors stats's DEFAULT_PROPERTIES list.
+const ITQAN_GA_PROPERTIES = {
+  itqanLanding: '481677039', // itqan.dev — the user-asked KPI
+  cms: '518600697', // cms.itqan.dev
+  community: '518403346', // community.itqan.dev (Flarum forum)
+  quranApps: '481625748', // quran-apps.itqan.dev
+} as const;
+
+function resolvePropertyId(): string {
+  return STATS_ENV.GA_PROPERTY_ID || ITQAN_GA_PROPERTIES.itqanLanding;
+}
 
 function isoDay(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -35,8 +52,7 @@ export async function getAnalytics(opts: {
   if (
     !STATS_ENV.GA_OAUTH_CLIENT_ID ||
     !STATS_ENV.GA_OAUTH_CLIENT_SECRET ||
-    !STATS_ENV.GA_OAUTH_REFRESH_TOKEN ||
-    !STATS_ENV.GA_PROPERTY_ID
+    !STATS_ENV.GA_OAUTH_REFRESH_TOKEN
   ) {
     return null;
   }
@@ -60,7 +76,7 @@ export async function getAnalytics(opts: {
     oauth2.setCredentials({ refresh_token: STATS_ENV.GA_OAUTH_REFRESH_TOKEN });
 
     const data = google.analyticsdata({ version: 'v1beta', auth: oauth2 });
-    const property = `properties/${STATS_ENV.GA_PROPERTY_ID}`;
+    const property = `properties/${resolvePropertyId()}`;
 
     const cur = { startDate: isoDay(opts.range.start), endDate: isoDay(opts.range.end) };
     const prev = previousWindow(opts.range);

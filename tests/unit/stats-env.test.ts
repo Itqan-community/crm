@@ -58,23 +58,20 @@ describe('STATS_ENV / sourceConfigured', () => {
     expect(m2.STATS_ENV.GITHUB_ORG).toBe('OtherOrg');
   });
 
-  it('analytics — needs all three OAuth vars + PROPERTY_ID', async () => {
+  it('analytics — OAuth triple is enough; PROPERTY_ID has a default', async () => {
     vi.stubEnv('stat_app_GA_OAUTH_CLIENT_ID', 'cid');
     vi.stubEnv('stat_app_GA_OAUTH_CLIENT_SECRET', 'cs');
     vi.resetModules();
     const m = await import('@/lib/stats/env');
+    // Two of three set → still missing one → unconfigured.
     expect(m.sourceConfigured('analytics')).toBe(false);
 
     vi.stubEnv('stat_app_GA_OAUTH_REFRESH_TOKEN', 'rt');
     vi.resetModules();
     const m2 = await import('@/lib/stats/env');
-    // OAuth triple set, but PROPERTY_ID still missing → unconfigured.
-    expect(m2.sourceConfigured('analytics')).toBe(false);
-
-    vi.stubEnv('stat_app_GA_PROPERTY_ID', '123456789');
-    vi.resetModules();
-    const m3 = await import('@/lib/stats/env');
-    expect(m3.sourceConfigured('analytics')).toBe(true);
+    // OAuth triple set; PROPERTY_ID falls back to the hardcoded
+    // itqan.dev id inside sources/analytics.ts. Configured.
+    expect(m2.sourceConfigured('analytics')).toBe(true);
   });
 
   it('forum / quranApps / cms — DB URL is the only requirement', async () => {
