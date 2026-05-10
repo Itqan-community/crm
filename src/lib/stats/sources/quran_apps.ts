@@ -23,13 +23,17 @@ export async function getQuranApps(): Promise<QuranAppsMetrics | null> {
     return null;
   }
 
+  // Don't force SSL — let the connection string decide. stats does
+  // the same in src/lib/db-quran-apps.ts (`new Pool({ connectionString })`
+  // with no extra options). Forcing TLS triggers "server does not
+  // support SSL connections" on the Itqan Postgres which is reached
+  // over a private network and doesn't speak TLS. Add `?sslmode=require`
+  // to the URL if a future deploy needs encryption in transit.
   const client = new pg.Client({
     connectionString: STATS_ENV.QURAN_APPS_DB_URL,
     statement_timeout: 10_000,
     query_timeout: 10_000,
     connectionTimeoutMillis: 10_000,
-    // Most managed Postgres providers (Supabase, Neon, Railway) require TLS.
-    ssl: { rejectUnauthorized: false },
   });
 
   try {

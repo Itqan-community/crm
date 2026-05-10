@@ -4,30 +4,38 @@
 // brought direct-source ingestion into CRM. Renaming a variable means
 // editing this file and nothing else.
 
-export const STATS_ENV = {
-  MAILERLITE_API_KEY: process.env.mailerlite_API_KEY,
+// Trim whitespace defensively. Pasting a refresh token / API key into
+// the Vercel UI sometimes drags a trailing newline or stray space,
+// which Google rejects as `invalid_client` and MailerLite as `401`.
+function read(key: string): string | undefined {
+  const v = process.env[key];
+  return v == null ? undefined : v.trim() || undefined;
+}
 
-  GITHUB_PAT: process.env.stat_app_GITHUB_PAT,
-  GITHUB_PAT_2: process.env.stat_app_GITHUB_PAT_2,
+export const STATS_ENV = {
+  MAILERLITE_API_KEY: read('mailerlite_API_KEY'),
+
+  GITHUB_PAT: read('stat_app_GITHUB_PAT'),
+  GITHUB_PAT_2: read('stat_app_GITHUB_PAT_2'),
   // Default applies when the var is unset OR empty string (some
   // platforms surface unset vars as ""). `||` handles both.
-  GITHUB_ORG: process.env.stat_app_GITHUB_ORG || 'Itqan-community',
+  GITHUB_ORG: read('stat_app_GITHUB_ORG') || 'Itqan-community',
 
-  GA_OAUTH_CLIENT_ID: process.env.stat_app_GA_OAUTH_CLIENT_ID,
-  GA_OAUTH_CLIENT_SECRET: process.env.stat_app_GA_OAUTH_CLIENT_SECRET,
-  GA_OAUTH_REFRESH_TOKEN: process.env.stat_app_GA_OAUTH_REFRESH_TOKEN,
+  GA_OAUTH_CLIENT_ID: read('stat_app_GA_OAUTH_CLIENT_ID'),
+  GA_OAUTH_CLIENT_SECRET: read('stat_app_GA_OAUTH_CLIENT_SECRET'),
+  GA_OAUTH_REFRESH_TOKEN: read('stat_app_GA_OAUTH_REFRESH_TOKEN'),
 
   // GA4 numeric property IDs per Itqan site. The names are not
   // secrets (visible in each site's tracking snippet) but storing
   // them as env vars keeps the code agnostic to property changes.
-  GA_PROPERTY_ID_itqan_dev: process.env.GA_PROPERTY_ID_itqan_dev,
-  GA_PROPERTY_ID_cms_itqan_dev: process.env.GA_PROPERTY_ID_cms_itqan_dev,
-  GA_PROPERTY_ID_community_itqan_dev: process.env.GA_PROPERTY_ID_community_itqan_dev,
-  GA_PROPERTY_ID_quran_apps_itqan_dev: process.env.GA_PROPERTY_ID_quran_apps_itqan_dev,
+  GA_PROPERTY_ID_itqan_dev: read('GA_PROPERTY_ID_itqan_dev'),
+  GA_PROPERTY_ID_cms_itqan_dev: read('GA_PROPERTY_ID_cms_itqan_dev'),
+  GA_PROPERTY_ID_community_itqan_dev: read('GA_PROPERTY_ID_community_itqan_dev'),
+  GA_PROPERTY_ID_quran_apps_itqan_dev: read('GA_PROPERTY_ID_quran_apps_itqan_dev'),
 
-  FLARUM_DB_URL: process.env.stat_app_FLARUM_DB_URL,
-  QURAN_APPS_DB_URL: process.env.stat_app_QURAN_APPS_DATABASE_URL,
-  CMS_DB_URL: process.env.stat_app_CMS_DB_URL,
+  FLARUM_DB_URL: read('stat_app_FLARUM_DB_URL'),
+  QURAN_APPS_DB_URL: read('stat_app_QURAN_APPS_DATABASE_URL'),
+  CMS_DB_URL: read('stat_app_CMS_DB_URL'),
 } as const;
 
 export type StatsSource =

@@ -35,12 +35,16 @@ export async function getCms(): Promise<CmsMetrics | null> {
     return null;
   }
 
+  // Same as quran_apps.ts: defer SSL to the connection string so the
+  // pg client matches stats's `new Pool({ connectionString })` defaults.
+  // The previous forced-SSL config was masking the real failure as a
+  // 10s timeout. Add `?sslmode=require` to the URL if encryption is
+  // required for this DB.
   const client = new pg.Client({
     connectionString: STATS_ENV.CMS_DB_URL,
-    statement_timeout: 10_000,
-    query_timeout: 10_000,
-    connectionTimeoutMillis: 10_000,
-    ssl: { rejectUnauthorized: false },
+    statement_timeout: 15_000,
+    query_timeout: 15_000,
+    connectionTimeoutMillis: 15_000,
   });
 
   try {
