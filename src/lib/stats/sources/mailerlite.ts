@@ -33,10 +33,16 @@ type Campaign = {
   subject: string;
   finished_at: string | null;
   scheduled_for: string | null;
+  // MailerLite v3 actually returns opens_count / clicks_count (NOT
+  // unique_opens_count). Verified by hitting the live API: the
+  // documentation lists `unique_opens_count` but the response carries
+  // `opens_count`. Keep both as optional so we tolerate either shape.
   stats?: {
     sent: number;
-    unique_opens_count: number;
-    unique_clicks_count: number;
+    opens_count?: number;
+    clicks_count?: number;
+    unique_opens_count?: number;
+    unique_clicks_count?: number;
     open_rate?: { float: number };
     click_rate?: { float: number };
   };
@@ -67,8 +73,11 @@ function toRow(c: Campaign): NewsletterCampaignRow {
     subject: c.subject,
     sentAt: c.finished_at ?? c.scheduled_for ?? null,
     sent: c.stats?.sent ?? 0,
-    opens: c.stats?.unique_opens_count ?? 0,
-    clicks: c.stats?.unique_clicks_count ?? 0,
+    // Prefer `opens_count` (what the live API actually returns) and
+    // fall back to `unique_opens_count` (what the docs claim) so we
+    // keep working if MailerLite ever switches.
+    opens: c.stats?.opens_count ?? c.stats?.unique_opens_count ?? 0,
+    clicks: c.stats?.clicks_count ?? c.stats?.unique_clicks_count ?? 0,
     // MailerLite reports rates as 0..1 floats. Convert to 0..100.
     openRate: (c.stats?.open_rate?.float ?? 0) * 100,
     clickRate: (c.stats?.click_rate?.float ?? 0) * 100,
