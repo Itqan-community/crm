@@ -1,12 +1,20 @@
 import { BigStat, Delta, fmt } from './atoms';
 import type { DashboardData } from './types';
+import type { DashboardWindow } from '@/lib/dashboard/types';
+
+const PERIOD_AR: Record<DashboardWindow, string> = {
+  day: 'اليوم',
+  month: 'الشهر',
+};
 
 export function PlatformSection({
   data,
   series,
+  window,
 }: {
   data: DashboardData['platform'];
   series: DashboardData['series'];
+  window: DashboardWindow;
 }) {
   const total = data.consumption.mix.reduce((s, x) => s + x.v, 0);
 
@@ -28,7 +36,7 @@ export function PlatformSection({
           value={data.publishers.value}
           delta={data.publishers.delta}
           series={series.publishers.now}
-          sub={`${data.publishers.new} جدد هذا الأسبوع`}
+          sub={`${data.publishers.new} جدد هذا ${PERIOD_AR[window]}`}
         />
         <BigStat
           label="عدد المستفيدين"
@@ -63,18 +71,19 @@ export function PlatformSection({
             ))}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
-            {data.consumption.mix.map((m) => (
-              <div
-                key={m.k}
-                style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5 }}
-              >
-                <span className="dot" style={{ background: m.c }} />
-                <span>{m.k}</span>
-                <span className="num" style={{ color: 'var(--muted)' }}>
-                  {((m.v / total) * 100).toFixed(0)}%
-                </span>
-              </div>
-            ))}
+            {data.consumption.mix.map((m) => {
+              const pct = total > 0 ? ((m.v / total) * 100).toFixed(0) + '%' : '—';
+              return (
+                <div
+                  key={m.k}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5 }}
+                >
+                  <span className="dot" style={{ background: m.c }} />
+                  <span>{m.k}</span>
+                  <span className="num" style={{ color: 'var(--muted)' }}>{pct}</span>
+                </div>
+              );
+            })}
           </div>
         </div>
 

@@ -1,11 +1,23 @@
 import { fmt } from './atoms';
 import type { DashboardData } from './types';
+import type { DashboardWindow } from '@/lib/dashboard/types';
 
 const W = 720;
 const H = 220;
 const P = 16;
 
-export function HeroBand({ data }: { data: DashboardData }) {
+const PERIOD_AR: Record<DashboardWindow, string> = {
+  day: 'اليوم السابق',
+  month: 'الشهر السابق',
+};
+
+export function HeroBand({
+  data,
+  window,
+}: {
+  data: DashboardData;
+  window: DashboardWindow;
+}) {
   const heroSeries = data.series.engagement.now;
   const heroPrev = data.series.engagement.prev;
   const all = [...heroSeries, ...heroPrev];
@@ -83,9 +95,8 @@ export function HeroBand({ data }: { data: DashboardData }) {
                 fontWeight: 500,
               }}
             >
-              ↑ {data.community.engagement.delta}% عن الأسبوع السابق
+              ↑ {data.community.engagement.delta}% عن {PERIOD_AR[window]}
             </span>
-            <span style={{ fontSize: 12, opacity: 0.7 }}>ذروة يوم الجمعة · 520 تفاعل</span>
           </div>
           <div style={{ marginTop: 18, display: 'flex', gap: 18, fontSize: 11.5, opacity: 0.85, flexWrap: 'wrap' }}>
             {data.community.engagement.breakdown.slice(0, 4).map((b) => (

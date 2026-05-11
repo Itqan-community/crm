@@ -3,8 +3,15 @@ import { HeroBand } from './HeroBand';
 import { CommunitySection } from './CommunitySection';
 import { PlatformSection } from './PlatformSection';
 import type { DashboardData } from './types';
+import type { DashboardWindow } from '@/lib/dashboard/types';
 
-export function Dashboard({ data }: { data: DashboardData }) {
+export function Dashboard({
+  data,
+  window,
+}: {
+  data: DashboardData;
+  window: DashboardWindow;
+}) {
   return (
     // Negative margin escapes AdminLayout's <main className="p-4 md:p-6"> so
     // the gradient backdrop fills the viewport edge-to-edge.
@@ -20,11 +27,11 @@ export function Dashboard({ data }: { data: DashboardData }) {
           `,
         }}
       >
-        <Toolbar range={data.range} />
+        <Toolbar range={data.range} window={window} />
         <div style={{ padding: 24 }}>
-          <HeroBand data={data} />
+          <HeroBand data={data} window={window} />
           <CommunitySection data={data.community} series={data.series} />
-          <PlatformSection data={data.platform} series={data.series} />
+          <PlatformSection data={data.platform} series={data.series} window={window} />
         </div>
       </div>
     </div>

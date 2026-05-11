@@ -1,4 +1,27 @@
-export function Toolbar({ range }: { range: { label: string; compare: string } }) {
+'use client';
+
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useTransition } from 'react';
+import type { DashboardWindow } from '@/lib/dashboard/types';
+
+export function Toolbar({
+  range,
+  window,
+}: {
+  range: { label: string; compare: string };
+  window: DashboardWindow;
+}) {
+  const router = useRouter();
+  const params = useSearchParams();
+  const [pending, startTransition] = useTransition();
+
+  const setWindow = (next: DashboardWindow) => {
+    if (next === window) return;
+    const sp = new URLSearchParams(params.toString());
+    sp.set('window', next);
+    startTransition(() => router.push(`?${sp.toString()}`));
+  };
+
   return (
     <div
       style={{
@@ -9,6 +32,8 @@ export function Toolbar({ range }: { range: { label: string; compare: string } }
         borderBottom: '1px solid var(--rule-soft)',
         gap: 16,
         flexWrap: 'wrap',
+        opacity: pending ? 0.6 : 1,
+        transition: 'opacity .15s ease',
       }}
     >
       <div>
@@ -21,8 +46,20 @@ export function Toolbar({ range }: { range: { label: string; compare: string } }
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div className="seg" role="group" aria-label="نطاق زمني">
-          <button type="button" aria-pressed="false">اليوم</button>
-          <button type="button" aria-pressed="true">الشهر</button>
+          <button
+            type="button"
+            aria-pressed={window === 'day'}
+            onClick={() => setWindow('day')}
+          >
+            اليوم
+          </button>
+          <button
+            type="button"
+            aria-pressed={window === 'month'}
+            onClick={() => setWindow('month')}
+          >
+            الشهر
+          </button>
         </div>
         <button type="button" className="dash-btn">⤓ تصدير CSV</button>
       </div>

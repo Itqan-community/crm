@@ -73,18 +73,28 @@ export function CommunitySection({
             <Delta value={data.socialReach.delta} />
           </div>
           <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {data.socialReach.channels.map((c) => (
-              <div
-                key={c.k}
-                style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}
-              >
-                <span style={{ color: 'var(--muted)' }}>{c.k}</span>
-                <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <span className="num">{fmt(c.v)}</span>
-                  <Delta value={c.d} />
-                </span>
+            {data.socialReach.channels.length === 0 ? (
+              <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.6 }}>
+                لا توجد بيانات بعد.
+                <br />
+                <a href="/admin/settings/metrics" style={{ color: 'var(--accent)' }}>
+                  أدخل أرقام الشبكات الاجتماعية ←
+                </a>
               </div>
-            ))}
+            ) : (
+              data.socialReach.channels.map((c) => (
+                <div
+                  key={c.k}
+                  style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}
+                >
+                  <span style={{ color: 'var(--muted)' }}>{c.k}</span>
+                  <span style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                    <span className="num">{fmt(c.v)}</span>
+                    {c.d !== 0 && <Delta value={c.d} />}
+                  </span>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
