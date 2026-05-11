@@ -2,10 +2,9 @@
 
 import { useState, useTransition } from 'react';
 
-// One-click trigger for /api/cron/dashboard-metrics?backfill=30. Reads
-// CRON_SECRET out of NEXT_PUBLIC_CRON_TRIGGER_TOKEN if present (admins
-// only see this page so we tolerate a NEXT_PUBLIC token) — otherwise
-// we omit auth and rely on the dev fallback in the route.
+// One-click trigger for /api/admin/dashboard-backfill. That endpoint
+// authenticates via the Supabase session cookie (admin role) — no
+// Bearer token needed since this page already gates on requireAdmin.
 export function BackfillButton({ days = 30 }: { days?: number }) {
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<string | null>(null);
@@ -16,11 +15,13 @@ export function BackfillButton({ days = 30 }: { days?: number }) {
     setResult(null);
     startTransition(async () => {
       try {
-        const token = process.env.NEXT_PUBLIC_CRON_TRIGGER_TOKEN;
-        const res = await fetch(`/api/cron/dashboard-metrics?backfill=${days}`, {
-          headers: token ? { authorization: `Bearer ${token}` } : {},
+        const res = await fetch(`/api/admin/dashboard-backfill?days=${days}`, {
+          method: 'POST',
         });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) {
+          const body = await res.text().catch(() => '');
+          throw new Error(body || `HTTP ${res.status}`);
+        }
         const data = (await res.json()) as {
           written?: number;
           perSource?: Record<string, number | string>;
