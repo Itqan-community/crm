@@ -135,25 +135,35 @@ export const METRIC_DEFINITIONS: MetricDef[] = [
 // table column order. days[0]=أحد lands on the right edge in RTL.
 const DAY_LABELS = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'];
 
-// Returns the current calendar week (Sun..Sat) with every metric's
-// stored value + meta for each day. Missing rows default to 0/{} so
-// the table always has a complete grid to render.
-export async function loadCurrentWeekForEdit(): Promise<EditableMetric[]> {
+// Returns the PREVIOUS calendar week (Sun..Sat, the seven days
+// before this week's Sunday) with every metric's stored value + meta
+// for each day. We edit last week — not this week — because the
+// past week is fully observed: every day actually happened, so the
+// reviewer can fill numbers for all seven cells. This also keeps
+// the dashboard's dashed comparison line (which represents the
+// previous calendar week) in sync with whatever the admin enters.
+// Missing rows default to 0/{} so the table always has a complete
+// grid to render.
+export async function loadLastWeekForEdit(): Promise<EditableMetric[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const dow = today.getDay();
-  const sunday = new Date(today);
-  sunday.setDate(today.getDate() - dow);
+  // Sunday of THIS week, then back up one full week.
+  const thisSunday = new Date(today);
+  thisSunday.setDate(today.getDate() - dow);
+  const lastSunday = new Date(thisSunday);
+  lastSunday.setDate(thisSunday.getDate() - 7);
 
-  // Build the 7-day Sun→Sat range.
+  // Build the 7-day Sun→Sat range — all in the past, so no cells
+  // need to be disabled.
   const days: Array<{ date: string; label: string; isFuture: boolean }> = [];
   for (let i = 0; i < 7; i++) {
-    const d = new Date(sunday);
-    d.setDate(sunday.getDate() + i);
+    const d = new Date(lastSunday);
+    d.setDate(lastSunday.getDate() + i);
     days.push({
       date: d.toISOString().slice(0, 10),
       label: DAY_LABELS[i],
-      isFuture: d > today,
+      isFuture: false,
     });
   }
 

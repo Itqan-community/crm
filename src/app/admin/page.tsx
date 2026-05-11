@@ -1,6 +1,6 @@
 import { Dashboard } from '@/components/admin/dashboard/Dashboard';
 import { loadDashboardData } from '@/lib/dashboard/load';
-import { loadCurrentWeekForEdit } from '@/lib/dashboard/queries';
+import { loadLastWeekForEdit } from '@/lib/dashboard/queries';
 import type { DashboardWindow } from '@/lib/dashboard/types';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
@@ -28,7 +28,7 @@ export default async function AdminDashboardHome({
 
   const [data, editable] = await Promise.all([
     loadDashboardData(window),
-    isAdmin ? loadCurrentWeekForEdit() : Promise.resolve(null),
+    isAdmin ? loadLastWeekForEdit() : Promise.resolve(null),
   ]);
 
   return <Dashboard data={data} window={window} editable={editable} />;
