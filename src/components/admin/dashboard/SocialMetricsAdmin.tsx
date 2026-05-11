@@ -65,7 +65,7 @@ export function SocialMetricsAdmin({ rows }: { rows: SocialEditorRow[] }) {
       <div>
         <h2 className="text-[16px] font-semibold">شبكات التواصل (إدخال يدوي)</h2>
         <p className="text-[12.5px] mt-1" style={{ color: 'var(--muted)' }}>
-          هذه الأرقام تظهر في بطاقة "الوصول عبر الشبكات" في لوحة البيانات.
+          هذه الأرقام تظهر في بطاقة «الوصول عبر الشبكات» في لوحة البيانات.
           أدخل لقطة جديدة كل أسبوع — اللقطة الأحدث هي ما يظهر في اللوحة.
         </p>
       </div>
