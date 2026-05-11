@@ -1,10 +1,48 @@
 import { useId } from 'react';
+import type { ReactNode } from 'react';
 
-export const fmt = (n: number): string => {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'م';
-  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'ك';
+// Number formatter for headline KPIs. Uses Arabic suffix words ("ألف"
+// for thousands, "مليون" for millions) rendered at a smaller font so
+// the digit stays the visual anchor, e.g. "128.4 ألف". Pure-string
+// callers (template literals) use fmtStr instead.
+export function fmt(n: number): ReactNode {
+  if (n >= 1_000_000) return <>{trimZero(n / 1_000_000)} <Suffix>مليون</Suffix></>;
+  if (n >= 1_000) return <>{trimZero(n / 1_000)} <Suffix>ألف</Suffix></>;
   return n.toLocaleString('ar-EG');
-};
+}
+
+// String version for places that need a plain string (template
+// literals, aria-labels, csv export, …). Keeps the same suffix
+// vocabulary as the JSX version.
+export function fmtStr(n: number): string {
+  if (n >= 1_000_000) return `${trimZero(n / 1_000_000)} مليون`;
+  if (n >= 1_000) return `${trimZero(n / 1_000)} ألف`;
+  return n.toLocaleString('ar-EG');
+}
+
+function trimZero(v: number): string {
+  return v.toFixed(1).replace(/\.0$/, '');
+}
+
+function Suffix({ children }: { children: ReactNode }) {
+  // 0.7em keeps the suffix proportional to whatever font-size the
+  // surrounding number uses (54px hero → 38px suffix, 28px BigStat →
+  // 20px suffix, 13px subtext → 9px suffix). margin-inline-start is
+  // logical so it mirrors correctly in RTL.
+  return (
+    <span
+      style={{
+        fontSize: '0.6em',
+        fontWeight: 500,
+        marginInlineStart: '0.18em',
+        opacity: 0.75,
+        verticalAlign: 'baseline',
+      }}
+    >
+      {children}
+    </span>
+  );
+}
 
 export const fmtPct = (n: number, withSign = true): string =>
   (withSign && n > 0 ? '+' : '') + n.toFixed(1) + '%';

@@ -1,4 +1,4 @@
-import { BigStat, Delta, fmt } from './atoms';
+import { BigStat, Delta, fmt, fmtStr } from './atoms';
 import type { DashboardData } from './types';
 import type { DashboardWindow } from '@/lib/dashboard/types';
 
@@ -43,7 +43,7 @@ export function PlatformSection({
           value={data.beneficiaries.value}
           delta={data.beneficiaries.delta}
           series={series.beneficiaries.now}
-          sub={`${fmt(data.beneficiaries.new)} انضموا حديثاً`}
+          sub={`${fmtStr(data.beneficiaries.new)} انضموا حديثاً`}
           accent="var(--gold)"
         />
 
