@@ -1,5 +1,6 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useMemo, useState, useTransition } from 'react';
 import { saveWeeklyMetrics, type WeeklyMetricInput } from '@/lib/dashboard/actions';
 import type { EditableMetric } from '@/lib/dashboard/queries';
@@ -30,6 +31,7 @@ export function MetricsTable({ metrics }: { metrics: EditableMetric[] }) {
     return map;
   }, [metrics]);
 
+  const router = useRouter();
   const [values, setValues] = useState<CellMap>(initial);
   const [dirty, setDirty] = useState<Set<CellKey>>(new Set());
   const [pending, startTransition] = useTransition();
@@ -82,6 +84,7 @@ export function MetricsTable({ metrics }: { metrics: EditableMetric[] }) {
         await saveWeeklyMetrics(payload);
         setDirty(new Set());
         setFeedback({ kind: 'ok', msg: `تم حفظ ${payload.length} يوماً — ستظهر التحديثات في الرسوم.` });
+        router.refresh();
       } catch (e) {
         setFeedback({ kind: 'err', msg: e instanceof Error ? e.message : 'فشل الحفظ' });
       }

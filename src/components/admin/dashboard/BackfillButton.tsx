@@ -1,11 +1,13 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
 // One-click trigger for /api/admin/dashboard-backfill. That endpoint
 // authenticates via the Supabase session cookie (admin role) — no
 // Bearer token needed since this page already gates on requireAdmin.
 export function BackfillButton({ days = 30 }: { days?: number }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -32,6 +34,9 @@ export function BackfillButton({ days = 30 }: { days?: number }) {
               .join(' · ')
           : '';
         setResult(`تم — ${data.written ?? 0} صف · ${perSource}`);
+        // Re-fetch /admin so the metrics table + charts repaint with
+        // the freshly written rows instead of the stale 0s.
+        router.refresh();
       } catch (e) {
         setError(e instanceof Error ? e.message : 'فشل');
       }
