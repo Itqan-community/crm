@@ -3,7 +3,7 @@ import type { DashboardData } from './types';
 import type { DashboardWindow } from '@/lib/dashboard/types';
 
 const W = 720;
-const H = 220;
+const H = 200;
 const P = 16;
 
 const PERIOD_AR: Record<DashboardWindow, string> = {
@@ -21,6 +21,9 @@ export function HeroBand({
   const heroSeries = data.series.engagement.now;
   const heroPrev = data.series.engagement.prev;
   const all = [...heroSeries, ...heroPrev];
+  // "All zeros" → no daily snapshot history yet. Drawing a flat line at
+  // the bottom edge looks broken; show a placeholder instead.
+  const hasSeries = all.some((v) => v > 0);
   const min = Math.min(...all) * 0.9;
   const max = Math.max(...all) * 1.08;
   const range = max - min || 1;
@@ -110,54 +113,80 @@ export function HeroBand({
           </div>
         </div>
         <div style={{ position: 'relative' }}>
-          <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none">
-            <defs>
-              <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#D4B483" stopOpacity="0.55" />
-                <stop offset="100%" stopColor="#D4B483" stopOpacity="0" />
-              </linearGradient>
-            </defs>
-            <path
-              d={toPath(heroPrev)}
-              stroke="rgba(255,255,255,0.35)"
-              strokeWidth="1.4"
-              fill="none"
-              strokeDasharray="4 5"
-            />
-            <path
-              d={
-                toPath(heroSeries) +
-                ` L${P + (heroSeries.length - 1) * step},${H - P} L${P},${H - P} Z`
-              }
-              fill="url(#hero-area)"
-            />
-            <path
-              d={toPath(heroSeries)}
-              stroke="#E6C99A"
-              strokeWidth="2.4"
-              fill="none"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-            {heroSeries.map((v, i) => {
-              const x = P + i * step;
-              const y = H - P - ((v - min) / range) * (H - P * 2);
-              return <circle key={i} cx={x} cy={y} r="3" fill="#E6C99A" />;
-            })}
-            {data.days.map((d, i) => (
-              <text
-                key={d}
-                x={P + i * step}
-                y={H - 2}
-                fontSize="10.5"
-                fill="rgba(255,255,255,0.55)"
-                textAnchor="middle"
-                fontFamily="var(--font-body)"
+          {hasSeries ? (
+            <>
+              {/* Chart paths only — labels live in the HTML row below
+                  so they don't get stretched by preserveAspectRatio="none". */}
+              <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" style={{ display: 'block' }}>
+                <defs>
+                  <linearGradient id="hero-area" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#D4B483" stopOpacity="0.55" />
+                    <stop offset="100%" stopColor="#D4B483" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                <path
+                  d={toPath(heroPrev)}
+                  stroke="rgba(255,255,255,0.35)"
+                  strokeWidth="1.4"
+                  fill="none"
+                  strokeDasharray="4 5"
+                  vectorEffect="non-scaling-stroke"
+                />
+                <path
+                  d={
+                    toPath(heroSeries) +
+                    ` L${P + (heroSeries.length - 1) * step},${H - P} L${P},${H - P} Z`
+                  }
+                  fill="url(#hero-area)"
+                />
+                <path
+                  d={toPath(heroSeries)}
+                  stroke="#E6C99A"
+                  strokeWidth="2.4"
+                  fill="none"
+                  strokeLinejoin="round"
+                  strokeLinecap="round"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </svg>
+              {/* Day labels rendered in HTML so each glyph keeps its
+                  natural width regardless of how wide the SVG stretches. */}
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  fontSize: 11,
+                  color: 'rgba(255,255,255,0.55)',
+                  marginTop: 6,
+                  paddingInline: P,
+                  fontFamily: 'var(--font-body)',
+                }}
               >
-                {d}
-              </text>
-            ))}
-          </svg>
+                {data.days.map((d) => (
+                  <span key={d}>{d}</span>
+                ))}
+              </div>
+            </>
+          ) : (
+            <div
+              style={{
+                height: H,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'rgba(255,255,255,0.55)',
+                fontSize: 13,
+                lineHeight: 1.6,
+                textAlign: 'center',
+                border: '1px dashed rgba(255,255,255,0.2)',
+                borderRadius: 12,
+              }}
+            >
+              لم تُسجَّل بيانات يومية بعد.
+              <br />
+              ستظهر هنا حالما يبدأ تخزين اللقطات اليومية.
+            </div>
+          )}
         </div>
       </div>
     </div>

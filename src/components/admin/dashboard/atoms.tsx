@@ -64,7 +64,14 @@ export function Sparkline({
 }) {
   const W = 200;
   const H = height;
+  const id = useId();
   const all = prev ? [...data, ...prev] : data;
+  // Empty / all-zero series — a "flat line at bottom" reads as broken.
+  // Render nothing so the card just shows its KPI without a misleading
+  // chart artifact; the parent still allots space.
+  if (!all.some((v) => v > 0)) {
+    return <div style={{ height: H }} aria-hidden />;
+  }
   const min = Math.min(...all);
   const max = Math.max(...all);
   const range = max - min || 1;
@@ -80,7 +87,6 @@ export function Sparkline({
   };
   const linePath = path(data);
   const areaPath = `${linePath} L${W},${H} L0,${H} Z`;
-  const id = useId();
   return (
     <svg
       viewBox={`0 0 ${W} ${H}`}
