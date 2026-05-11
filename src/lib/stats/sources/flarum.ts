@@ -12,6 +12,7 @@
 
 import { STATS_ENV } from '../env';
 import type { DateRange, ForumMetrics } from '../types';
+import { describeError } from '../util';
 
 function fmtDate(d: Date): string {
   return d.toISOString().slice(0, 19).replace('T', ' ');
@@ -103,8 +104,4 @@ export async function getForum(opts: {
       }
     }
   }
-}
-
-function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

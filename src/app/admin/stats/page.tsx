@@ -1,4 +1,3 @@
-import { redirect } from 'next/navigation';
 import { requireTeamPage } from '@/lib/admin-guard';
 import { loadStatsBundle } from '@/lib/stats/loader';
 import { EnvStatusBanner } from '@/components/admin/stats/EnvStatusBanner';
@@ -12,8 +11,9 @@ export default async function AdminStatsPage({
 }: {
   searchParams: Promise<{ days?: string }>;
 }) {
-  const ctx = await requireTeamPage();
-  if (!ctx) redirect('/admin/login');
+  // requireTeamPage redirects internally on missing auth — no need to
+  // re-check its return value.
+  await requireTeamPage();
 
   const sp = await searchParams;
   const parsed = Number.parseInt(sp.days ?? '', 10);

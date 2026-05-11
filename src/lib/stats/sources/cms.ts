@@ -20,6 +20,7 @@
 
 import { STATS_ENV } from '../env';
 import type { CmsMetrics } from '../types';
+import { describeError } from '../util';
 
 const NEW_WINDOW_DAYS = 30;
 
@@ -118,8 +119,4 @@ async function count(
 ): Promise<number> {
   const res = await client.query<{ c: number | string }>(sql, params);
   return Number(res.rows[0]?.c ?? 0) || 0;
-}
-
-function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

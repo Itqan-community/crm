@@ -10,6 +10,7 @@
 
 import { STATS_ENV } from '../env';
 import type { QuranAppsMetrics } from '../types';
+import { describeError } from '../util';
 
 export async function getQuranApps(): Promise<QuranAppsMetrics | null> {
   if (!STATS_ENV.QURAN_APPS_DB_URL) return null;
@@ -94,8 +95,4 @@ function toNumber(v: string | number | null | undefined): number {
   if (v == null) return 0;
   const n = typeof v === 'string' ? Number(v) : v;
   return Number.isFinite(n) ? n : 0;
-}
-
-function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

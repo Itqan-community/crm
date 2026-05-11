@@ -10,6 +10,7 @@
 
 import { STATS_ENV } from '../env';
 import type { DateRange, GithubMetrics } from '../types';
+import { describeError } from '../util';
 
 const GITHUB_API = 'https://api.github.com';
 
@@ -140,8 +141,4 @@ async function listOrgRepos(org: string, pool: string[]): Promise<RepoSummary[]>
     if (batch.length < 100) break;
   }
   return all;
-}
-
-function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }

@@ -15,6 +15,7 @@
 
 import { STATS_ENV } from '../env';
 import type { AnalyticsMetrics, ChangeMetric, DateRange } from '../types';
+import { describeError } from '../util';
 
 function isoDay(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -146,16 +147,6 @@ export async function getAnalytics(opts: {
     }
     throw err;
   }
-}
-
-function describeError(err: unknown): string {
-  if (!err) return 'unknown';
-  if (err instanceof Error) return err.message;
-  if (typeof err === 'object' && err !== null) {
-    const obj = err as Record<string, unknown>;
-    return String(obj.message ?? obj.error ?? JSON.stringify(obj).slice(0, 300));
-  }
-  return String(err);
 }
 
 // Show the first 6 + last 4 characters of a credential so the user can

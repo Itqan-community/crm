@@ -20,6 +20,7 @@
 
 import { STATS_ENV } from '../env';
 import type { NewsletterCampaignRow, NewsletterMetrics } from '../types';
+import { describeError } from '../util';
 
 const API_BASE = 'https://connect.mailerlite.com/api';
 
@@ -120,8 +121,4 @@ export async function getNewsletter(): Promise<NewsletterMetrics | null> {
 function average(xs: number[]): number {
   if (xs.length === 0) return 0;
   return xs.reduce((a, b) => a + b, 0) / xs.length;
-}
-
-function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
