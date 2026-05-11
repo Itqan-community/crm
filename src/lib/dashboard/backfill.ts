@@ -33,8 +33,18 @@ export async function backfillDailyMetrics(opts: { days?: number } = {}): Promis
     backfillForum(days),
     backfillCms(days),
     backfillSocialReach(days),
+    backfillNewsletter(days),
+    backfillAnalytics(days),
+    backfillShares(days),
   ]);
-  const labels = ['forum', 'cms', 'social_reach'] as const;
+  const labels = [
+    'forum',
+    'cms',
+    'social_reach',
+    'newsletter',
+    'analytics',
+    'shares',
+  ] as const;
 
   const allRows: DailyRow[] = [];
   for (let i = 0; i < settled.length; i++) {
@@ -222,6 +232,167 @@ async function backfillSocialReach(days: number): Promise<DailyRow[]> {
     out.push({ day, metric_key: 'social_reach', value: total });
   }
   return out;
+}
+
+// ---- Newsletter (MailerLite) -----------------------------------------------
+
+async function backfillNewsletter(days: number): Promise<DailyRow[]> {
+  if (!STATS_ENV.MAILERLITE_API_KEY) return [];
+  // Lift the existing single-window source — it already returns
+  // recentCampaigns ordered newest-first. Each campaign has its own
+  // sent_at; we bucket those into per-day rows. Days with no send
+  // get NO row (gap in the line), since "0 sent" would lie when the
+  // truth is "no campaign that day".
+  const { getNewsletter } = await import('@/lib/stats/sources/mailerlite');
+  const n = await getNewsletter();
+  if (!n) return [];
+
+  const cutoff = new Date(Date.now() - days * 86_400_000);
+  const byDay = new Map<
+    string,
+    { sent: number; opens: number; rateSum: number; campaigns: number }
+  >();
+  for (const c of n.recentCampaigns) {
+    if (!c.sentAt) continue;
+    const sent = new Date(c.sentAt);
+    if (sent < cutoff) continue;
+    const k = c.sentAt.slice(0, 10);
+    const agg = byDay.get(k) ?? { sent: 0, opens: 0, rateSum: 0, campaigns: 0 };
+    agg.sent += c.sent;
+    agg.opens += c.opens;
+    agg.rateSum += c.openRate;
+    agg.campaigns += 1;
+    byDay.set(k, agg);
+  }
+
+  return Array.from(byDay, ([day, agg]) => ({
+    day,
+    metric_key: 'newsletter' as const,
+    value: agg.sent,
+    meta: {
+      rate: agg.campaigns > 0 ? Math.round((agg.rateSum / agg.campaigns) * 10) / 10 : 0,
+      opened: agg.opens,
+      // prevRate carries the rolling 7-day average from the live
+      // newsletter object — same for every backfilled row, the ring
+      // card uses it as the "compared to" baseline.
+      prevRate: Math.round(n.last7Days.avgOpenRate * 10) / 10,
+    },
+  }));
+}
+
+// ---- Site visits (Google Analytics) ----------------------------------------
+
+async function backfillAnalytics(days: number): Promise<DailyRow[]> {
+  if (
+    !STATS_ENV.GA_OAUTH_CLIENT_ID ||
+    !STATS_ENV.GA_OAUTH_CLIENT_SECRET ||
+    !STATS_ENV.GA_OAUTH_REFRESH_TOKEN ||
+    !STATS_ENV.GA_PROPERTY_ID_itqan_dev
+  ) {
+    return [];
+  }
+
+  type GoogleApis = typeof import('googleapis');
+  const { google } = (await import('googleapis')) as GoogleApis;
+  const oauth2 = new google.auth.OAuth2(
+    STATS_ENV.GA_OAUTH_CLIENT_ID,
+    STATS_ENV.GA_OAUTH_CLIENT_SECRET,
+  );
+  oauth2.setCredentials({ refresh_token: STATS_ENV.GA_OAUTH_REFRESH_TOKEN });
+
+  const data = google.analyticsdata({ version: 'v1beta', auth: oauth2 });
+  const property = `properties/${STATS_ENV.GA_PROPERTY_ID_itqan_dev}`;
+  // Single bulk request — `date` dimension expands the window into one
+  // row per day. ~30 rows per metric, sub-second response from GA.
+  const startDate = isoDaysAgoExact(days - 1);
+  const endDate = isoDaysAgoExact(0);
+  const resp = await data.properties.runReport({
+    property,
+    requestBody: {
+      dateRanges: [{ startDate, endDate }],
+      dimensions: [{ name: 'date' }],
+      metrics: [
+        { name: 'screenPageViews' },
+        { name: 'activeUsers' },
+        { name: 'sessions' },
+        { name: 'newUsers' },
+      ],
+      orderBys: [{ dimension: { dimensionName: 'date' } }],
+    },
+  });
+
+  const out: DailyRow[] = [];
+  for (const row of resp.data.rows ?? []) {
+    const ga = row.dimensionValues?.[0]?.value ?? ''; // YYYYMMDD
+    if (!/^\d{8}$/.test(ga)) continue;
+    const day = `${ga.slice(0, 4)}-${ga.slice(4, 6)}-${ga.slice(6, 8)}`;
+    const m = row.metricValues ?? [];
+    const pageviews = Number(m[0]?.value ?? 0);
+    const activeUsers = Number(m[1]?.value ?? 0);
+    const sessions = Number(m[2]?.value ?? 0);
+    const newUsers = Number(m[3]?.value ?? 0);
+    out.push({
+      day,
+      metric_key: 'site_visits',
+      value: pageviews,
+      meta: {
+        uniq: activeUsers,
+        returning: Math.max(0, sessions - newUsers),
+      },
+    });
+  }
+  return out;
+}
+
+// ---- Shares (forum post_likes cumulative) ----------------------------------
+
+async function backfillShares(days: number): Promise<DailyRow[]> {
+  if (!STATS_ENV.FLARUM_DB_URL) return [];
+
+  type Mysql = typeof import('mysql2/promise');
+  const mysql = (await import('mysql2/promise')) as Mysql;
+  const conn = await mysql.createConnection({
+    uri: STATS_ENV.FLARUM_DB_URL,
+    connectTimeout: 10_000,
+  });
+  try {
+    // post_likes has a `created_at` column (Flarum's likes extension).
+    // For each day in the window, count likes whose created_at ≤ that
+    // day — that's the cumulative "total community likes" we surface
+    // as "مشاركات المجتمع".
+    type Row = { day: string | Date; cnt: number | string };
+    const startDate = isoDaysAgo(days);
+    const [rows] = (await conn.query(
+      `SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+       FROM post_likes
+       WHERE created_at >= ?
+       GROUP BY DATE(created_at)`,
+      [startDate],
+    )) as unknown as [Row[]];
+
+    // Also fetch the baseline count BEFORE the window so we can build
+    // cumulative totals correctly — without it the first day starts at
+    // its own count rather than the running total.
+    const [baseline] = (await conn.query(
+      `SELECT COUNT(*) AS cnt FROM post_likes WHERE created_at < ?`,
+      [startDate],
+    )) as unknown as [Array<{ cnt: number | string }>];
+    let running = Number(baseline[0]?.cnt ?? 0);
+
+    // Build cumulative per day, filling gaps so every day in the window
+    // emits a row.
+    const dailyDelta = new Map<string, number>();
+    for (const r of rows) dailyDelta.set(normalizeDay(r.day), Number(r.cnt));
+    const out: DailyRow[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const day = isoDaysAgoExact(i);
+      running += dailyDelta.get(day) ?? 0;
+      out.push({ day, metric_key: 'shares', value: running });
+    }
+    return out;
+  } finally {
+    await conn.end().catch(() => {});
+  }
 }
 
 // ---- Helpers ----------------------------------------------------------------
