@@ -33,9 +33,11 @@ export async function GET(request: NextRequest) {
     }
     // Try a few URL encodings — MailerLite has been strict about
     // bracket encoding in the past.
+    // MailerLite rejects `limit` below 10 — "The selected limit is
+    // invalid". Use 10 (smallest accepted page) for the diagnostic.
     const url =
       new URL(request.url).searchParams.get('url') ??
-      'https://connect.mailerlite.com/api/campaigns?filter%5Bstatus%5D=sent&limit=3';
+      'https://connect.mailerlite.com/api/campaigns?filter%5Bstatus%5D=sent&limit=10';
     const res = await fetch(url, {
       headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
     });
