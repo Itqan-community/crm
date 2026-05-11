@@ -14,6 +14,7 @@ type Item = {
 
 const ITEMS: Item[] = [
   { href: '/admin',                       label: 'الطلبات',          icon: InboxIcon,    adminOnly: false },
+  { href: '/admin/stats',                 label: 'البيانات',          icon: BarChartIcon, adminOnly: false },
   { href: '/admin/settings',              label: 'الحالات والفريق', icon: UsersIcon,    adminOnly: true  },
   { href: '/admin/settings/form-builder', label: 'بناء النموذج',    icon: WrenchIcon,   adminOnly: true  },
 ];
@@ -151,6 +152,16 @@ function WrenchIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-2.6 2.4-2.4z" />
+    </svg>
+  );
+}
+
+function BarChartIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="12" y1="20" x2="12" y2="10" />
+      <line x1="18" y1="20" x2="18" y2="4" />
+      <line x1="6" y1="20" x2="6" y2="14" />
     </svg>
   );
 }
