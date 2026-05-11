@@ -27,6 +27,23 @@ export const ALL_METRIC_KEYS: MetricKey[] = [
   'shares',
 ];
 
+// "flow" metrics count something that happens within a day — for a
+// week/month headline we sum them. "cumulative" metrics are running
+// totals where the latest reading IS the headline; the delta then
+// compares today's reading against the reading N days ago.
+type MetricSemantic = 'flow' | 'cumulative';
+
+const METRIC_SEMANTIC: Record<MetricKey, MetricSemantic> = {
+  engagement:    'flow',
+  newsletter:    'cumulative', // bursty — last campaign's sent count
+  social_reach:  'cumulative', // followers/impressions at a point in time
+  site_visits:   'flow',
+  publishers:    'cumulative',
+  beneficiaries: 'cumulative',
+  consumption:   'cumulative',
+  shares:        'cumulative', // total likes accrued, not per-day
+};
+
 // Per-metric sub-fields the dashboard cares about. Stored in the
 // `meta` jsonb column alongside the headline value so /admin can
 // render the full surface from a single internal query — no live
@@ -54,41 +71,6 @@ export type LatestSnapshot = {
   meta: Record<string, unknown>;
 };
 
-// Read the last 2N days of a metric and split into now / prev so the
-// chart can render both lines. Returns empty arrays when there isn't
-// enough history to split — the caller's empty-data guard then hides
-// the chart.
-export async function loadDailySeries(
-  metric: MetricKey,
-  days = 7,
-): Promise<{ now: number[]; prev: number[] }> {
-  const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
-    .from('dashboard_metric_daily')
-    .select('day, value')
-    .eq('metric_key', metric)
-    .order('day', { ascending: false })
-    .limit(days * 2);
-  if (!data || data.length < 2) return { now: [], prev: [] };
-  // Oldest → newest so the chart reads left-to-right (the SVG itself
-  // is mirrored by RTL on the parent).
-  const ordered = data.slice().reverse().map((r) => Number(r.value));
-  // Right half = "now", left half = "prev". When we have fewer than
-  // 2N points the prev side just gets fewer dots (the dashed line
-  // shortens but the chart still renders).
-  const splitAt = Math.max(0, ordered.length - days);
-  return {
-    now: ordered.slice(splitAt),
-    prev: ordered.slice(0, splitAt),
-  };
-}
-
-export async function loadAllSeries(days = 7): Promise<Record<MetricKey, { now: number[]; prev: number[] }>> {
-  const entries = await Promise.all(
-    ALL_METRIC_KEYS.map(async (k) => [k, await loadDailySeries(k, days)] as const),
-  );
-  return Object.fromEntries(entries) as Record<MetricKey, { now: number[]; prev: number[] }>;
-}
 
 // Upsert today's (or any given day's) values. Used by the daily cron
 // and by the backfill function.
@@ -105,19 +87,25 @@ export async function writeDailyRows(rows: DailyRow[]): Promise<{ written: numbe
   return { written: rows.length };
 }
 
-// Pull the latest snapshot per metric plus the row from `offsetDays`
-// ago so the adapter can compute deltas. Single query — feeds the
-// entire dashboard without touching live sources.
-export async function loadLatestSnapshots(offsetDays: number): Promise<Map<MetricKey, LatestSnapshot>> {
+// Window-aware aggregation. For each metric the value/delta semantics
+// follow METRIC_SEMANTIC:
+//   - flow:       value = Σ last windowDays daily readings.
+//                 previousValue = Σ the windowDays before that.
+//                 meta = per-field sum of those daily metas.
+//   - cumulative: value = latest reading (today's row).
+//                 previousValue = the row from windowDays ago.
+//                 meta = latest reading's meta (rates are point-in-time).
+// One Supabase round-trip drives the whole dashboard.
+export async function loadLatestSnapshots(windowDays: number): Promise<Map<MetricKey, LatestSnapshot>> {
   const supabase = await createSupabaseServerClient();
-  // Cap the fetch at offset + a buffer so we don't pull the whole
-  // table when daily history grows past 30 days. 8 metrics × ~40 days
-  // is still tiny.
+  // Pull enough daily rows to cover this window AND the previous one
+  // (for the delta comparison). +5 buffers against gaps.
+  const rowsPerMetric = windowDays * 2 + 5;
   const { data } = await supabase
     .from('dashboard_metric_daily')
     .select('day, metric_key, value, meta')
     .order('day', { ascending: false })
-    .limit((offsetDays + 5) * ALL_METRIC_KEYS.length);
+    .limit(rowsPerMetric * ALL_METRIC_KEYS.length);
   const byMetric = new Map<MetricKey, Array<{ value: number; meta: Record<string, unknown> }>>();
   for (const row of data ?? []) {
     const key = row.metric_key as MetricKey;
@@ -129,22 +117,105 @@ export async function loadLatestSnapshots(offsetDays: number): Promise<Map<Metri
   }
   const out = new Map<MetricKey, LatestSnapshot>();
   for (const [k, rows] of byMetric) {
-    const latest = rows[0];
-    // Pick the row offsetDays back if it exists; otherwise the oldest
-    // we have (the delta narrows to "since the table started").
-    const previous = rows[Math.min(rows.length - 1, offsetDays)] ?? latest;
-    const delta =
-      previous.value > 0
-        ? ((latest.value - previous.value) / previous.value) * 100
-        : 0;
+    const sem = METRIC_SEMANTIC[k];
+    const nowRows = rows.slice(0, windowDays);
+    const prevRows = rows.slice(windowDays, windowDays * 2);
+
+    let value: number;
+    let previousValue: number;
+    let meta: Record<string, unknown>;
+    if (sem === 'flow') {
+      value = nowRows.reduce((s, r) => s + r.value, 0);
+      previousValue = prevRows.reduce((s, r) => s + r.value, 0);
+      meta = sumMetaNumbers(nowRows.map((r) => r.meta));
+    } else {
+      // Cumulative: latest reading is current state; the reading from
+      // windowDays ago is what we compare against. If we have less
+      // history than that, fall back to the oldest row we do have so
+      // the delta narrows toward 0 instead of crashing.
+      value = nowRows[0]?.value ?? 0;
+      previousValue =
+        prevRows[0]?.value ?? rows[rows.length - 1]?.value ?? 0;
+      meta = nowRows[0]?.meta ?? {};
+    }
+
+    const delta = previousValue > 0 ? ((value - previousValue) / previousValue) * 100 : 0;
     out.set(k, {
-      value: latest.value,
-      previousValue: previous.value,
+      value,
+      previousValue,
       delta: Math.round(delta * 10) / 10,
-      meta: latest.meta,
+      meta,
     });
   }
   return out;
+}
+
+function sumMetaNumbers(metas: Array<Record<string, unknown>>): Record<string, number> {
+  const sum: Record<string, number> = {};
+  for (const m of metas) {
+    for (const [k, v] of Object.entries(m)) {
+      if (typeof v === 'number') sum[k] = (sum[k] ?? 0) + v;
+    }
+  }
+  return sum;
+}
+
+// Series for the hero area chart and the per-card sparklines —
+// always the current calendar week (Sun→Sat). Data is built in
+// REVERSE-weekday order: chart_data[0] = Saturday, chart_data[6] =
+// Sunday. The chart SVG draws x left-to-right (SVG isn't mirrored
+// by RTL parents), so index 0 lands at visual-left and index 6 at
+// visual-right. Pairing this with Sunday-first labels rendered in
+// an RTL flex row puts أحد on the right edge of both the labels
+// and the data — week starts on Sunday as Arabic readers expect.
+export async function loadCalendarWeekSeries(): Promise<
+  Record<MetricKey, { now: number[]; prev: number[] }>
+> {
+  const supabase = await createSupabaseServerClient();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dow = today.getDay(); // 0 = Sunday
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - dow);
+  const prevSunday = new Date(sunday);
+  prevSunday.setDate(sunday.getDate() - 7);
+  const saturday = new Date(sunday);
+  saturday.setDate(sunday.getDate() + 6);
+
+  const toKey = (d: Date) => d.toISOString().slice(0, 10);
+  const { data } = await supabase
+    .from('dashboard_metric_daily')
+    .select('day, metric_key, value')
+    .gte('day', toKey(prevSunday))
+    .lte('day', toKey(saturday));
+
+  // index by metric → day → value
+  const byMetricDay = new Map<MetricKey, Map<string, number>>();
+  for (const row of data ?? []) {
+    const k = row.metric_key as MetricKey;
+    if (!byMetricDay.has(k)) byMetricDay.set(k, new Map());
+    byMetricDay.get(k)!.set(row.day, Number(row.value));
+  }
+
+  const result = {} as Record<MetricKey, { now: number[]; prev: number[] }>;
+  for (const k of ALL_METRIC_KEYS) {
+    const byDay = byMetricDay.get(k) ?? new Map<string, number>();
+    const now: number[] = [];
+    const prev: number[] = [];
+    // dowIdx 6→0 = Sat→Sun, putting Sat at array[0] (SVG left) and
+    // Sun at array[6] (SVG right = visual right in RTL parent).
+    for (let dowIdx = 6; dowIdx >= 0; dowIdx--) {
+      const cur = new Date(sunday);
+      cur.setDate(sunday.getDate() + dowIdx);
+      const last = new Date(prevSunday);
+      last.setDate(prevSunday.getDate() + dowIdx);
+      // Future days in the current week shouldn't fabricate a value.
+      now.push(cur > today ? 0 : byDay.get(toKey(cur)) ?? 0);
+      prev.push(byDay.get(toKey(last)) ?? 0);
+    }
+    result[k] = { now, prev };
+  }
+  return result;
 }
 
 // Today as YYYY-MM-DD in the server's local TZ. Good enough — the

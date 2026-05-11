@@ -4,6 +4,7 @@ import type { DashboardWindow } from '@/lib/dashboard/types';
 
 const PERIOD_AR: Record<DashboardWindow, string> = {
   day: 'اليوم',
+  week: 'الأسبوع',
   month: 'الشهر',
 };
 

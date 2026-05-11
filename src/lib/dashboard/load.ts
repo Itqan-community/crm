@@ -17,7 +17,7 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { DashboardData } from '@/components/admin/dashboard/types';
 import {
   ALL_METRIC_KEYS,
-  loadAllSeries,
+  loadCalendarWeekSeries,
   loadLatestSnapshots,
   type LatestSnapshot,
   type MetricKey,
@@ -31,17 +31,19 @@ import {
   WINDOW_DAYS,
 } from './types';
 
-// Sunday-first weekday names — index matches JS Date.getDay().
-const DAY_NAMES_AR_BY_INDEX = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'];
+// Sunday-first labels, displayed in an RTL flex row so days[0]=أحد
+// lands on the right edge — matching the chart's data array which is
+// built Saturday→Sunday so its SVG-rightmost point is also Sunday.
+const DAY_LABELS_SUN_FIRST = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'];
 
-// Top-level entry. Two Supabase queries in parallel — typically <100ms
-// to first byte once the daily table is populated.
+// Top-level entry. Three Supabase queries in parallel — typically
+// <100ms once the daily table is populated.
 export async function loadDashboardData(window: DashboardWindow): Promise<DashboardData> {
-  const offsetDays = WINDOW_DAYS[window];
+  const windowDays = WINDOW_DAYS[window];
   const [snapshots, socialByChannel, series] = await Promise.all([
-    loadLatestSnapshots(offsetDays),
+    loadLatestSnapshots(windowDays),
     loadLatestSocialSnapshots(),
-    loadAllSeries(7),
+    loadCalendarWeekSeries(),
   ]);
   return buildDashboard(snapshots, socialByChannel, series, window);
 }
@@ -117,12 +119,14 @@ function buildDashboard(
       publishers: {
         value: publishers.value,
         delta: publishers.delta,
-        new: numFromMeta(publishers.meta, 'new_30d'),
+        // For cumulative metrics, "new in window" = current cum −
+        // cum from windowDays ago. Works for day / week / month.
+        new: Math.max(0, publishers.value - publishers.previousValue),
       },
       beneficiaries: {
         value: beneficiaries.value,
         delta: beneficiaries.delta,
-        new: numFromMeta(beneficiaries.meta, 'new_30d'),
+        new: Math.max(0, beneficiaries.value - beneficiaries.previousValue),
       },
       consumption: {
         value: consumption.value,
@@ -148,7 +152,7 @@ function buildDashboard(
       consumption:   series.consumption,
       shares:        series.shares,
     },
-    days: dayLabels(7),
+    days: dayLabels(),
   };
 }
 
@@ -170,32 +174,23 @@ function rangeLabel(window: DashboardWindow): DashboardData['range'] {
   const start = new Date(today.getTime() - (WINDOW_DAYS[window] - 1) * 86_400_000);
   const fmt = (d: Date) =>
     d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' });
+  const compare =
+    window === 'day'
+      ? 'مقارنة باليوم السابق'
+      : window === 'week'
+        ? 'مقارنة بالأسبوع السابق'
+        : 'مقارنة بالشهر السابق';
   return {
     label: `${fmt(start)} – ${fmt(today)} ${today.getFullYear()}`,
-    compare:
-      window === 'day' ? 'مقارنة باليوم السابق' : 'مقارنة بالشهر السابق',
+    compare,
   };
 }
 
-// Returns weekday names matching the chart's data positions (oldest →
-// newest). With the chart drawing left-to-right and the label row
-// inside an RTL parent (justify-content: space-between), labels[0]
-// renders on the right edge and labels[N-1] on the left.
-//
-// "Week starts on Sunday" — at the very least when today IS Sunday
-// the rightmost label is أحد. For any other day the labels truthfully
-// reflect what each chart point represents.
-function dayLabels(days: number): string[] {
-  const today = new Date();
-  const labels: string[] = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(today.getTime() - i * 86_400_000);
-    labels.push(DAY_NAMES_AR_BY_INDEX[d.getDay()]);
-  }
-  // Reverse so the array's [0] aligns with the right-edge label in RTL
-  // (the chart's "today" is the rightmost SVG point too, since SVG is
-  // not flipped by parent direction).
-  return labels.reverse();
+// Static Sun-first labels — RTL flex puts labels[0]=أحد on the right
+// edge, matching the calendar-week series which puts Sunday's value
+// at index 6 (SVG-rightmost). Same array for every window selection.
+function dayLabels(): string[] {
+  return [...DAY_LABELS_SUN_FIRST];
 }
 
 function numFromMeta(meta: Record<string, unknown> | undefined, key: string): number {

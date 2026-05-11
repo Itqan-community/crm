@@ -10,7 +10,10 @@ export default async function AdminDashboardHome({
   searchParams: Promise<{ window?: string }>;
 }) {
   const sp = await searchParams;
-  const window: DashboardWindow = sp.window === 'day' ? 'day' : 'month';
+  const window: DashboardWindow =
+    sp.window === 'day' || sp.window === 'month'
+      ? sp.window
+      : 'week';
   const data = await loadDashboardData(window);
   return <Dashboard data={data} window={window} />;
 }

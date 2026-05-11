@@ -55,6 +55,13 @@ export function Toolbar({
           </button>
           <button
             type="button"
+            aria-pressed={window === 'week'}
+            onClick={() => setWindow('week')}
+          >
+            الأسبوع
+          </button>
+          <button
+            type="button"
             aria-pressed={window === 'month'}
             onClick={() => setWindow('month')}
           >

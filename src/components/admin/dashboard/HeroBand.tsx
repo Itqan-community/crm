@@ -8,6 +8,7 @@ const P = 16;
 
 const PERIOD_AR: Record<DashboardWindow, string> = {
   day: 'اليوم السابق',
+  week: 'الأسبوع السابق',
   month: 'الشهر السابق',
 };
 

@@ -2,10 +2,11 @@
 // DashboardData in src/components/admin/dashboard/types.ts so the DB
 // row shape lives next to the queries that produce it).
 
-export type DashboardWindow = 'day' | 'month';
+export type DashboardWindow = 'day' | 'week' | 'month';
 
 export const WINDOW_DAYS: Record<DashboardWindow, number> = {
   day: 1,
+  week: 7,
   month: 30,
 };
 
