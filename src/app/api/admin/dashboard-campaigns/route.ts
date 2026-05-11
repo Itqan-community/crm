@@ -23,28 +23,32 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'admin_required' }, { status: 403 });
   }
 
-  // ?raw=1 mode: fetch MailerLite directly and dump the FIRST campaign's
-  // unparsed JSON. Lets us see exactly what fields the API actually
-  // returns, independent of our parsing.
+  // ?raw=1 mode: hit MailerLite directly and dump the unparsed JSON.
+  // Lets us see exactly what fields the API returns — or if it errors,
+  // what the error message says.
   if (new URL(request.url).searchParams.get('raw') === '1') {
     const apiKey = process.env.mailerlite_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ configured: false, hint: 'mailerlite_API_KEY missing' });
     }
-    const res = await fetch(
-      'https://connect.mailerlite.com/api/campaigns?filter[status]=sent&limit=3',
-      { headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' } },
-    );
+    // Try a few URL encodings — MailerLite has been strict about
+    // bracket encoding in the past.
+    const url =
+      new URL(request.url).searchParams.get('url') ??
+      'https://connect.mailerlite.com/api/campaigns?filter%5Bstatus%5D=sent&limit=3';
+    const res = await fetch(url, {
+      headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    });
     const text = await res.text();
     let json: unknown;
     try { json = JSON.parse(text); } catch { json = { raw_text: text }; }
-    // Return as-is, but pluck the first campaign + its stats so it's
-    // easy to scan.
     type R = { data?: Array<Record<string, unknown>> };
     const first = (json as R).data?.[0];
     return NextResponse.json({
-      configured: true,
+      ok: res.ok,
       http_status: res.status,
+      url_used: url,
+      body_on_error: res.ok ? null : json,
       first_campaign_keys: first ? Object.keys(first) : [],
       first_campaign_stats: first?.stats ?? null,
       first_campaign_full: first ?? null,
