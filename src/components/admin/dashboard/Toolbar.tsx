@@ -13,7 +13,7 @@ export function Toolbar({ range }: { range: { label: string; compare: string } }
     >
       <div>
         <div style={{ fontSize: 19, fontWeight: 600, fontFamily: 'var(--font-display)' }}>
-          نظرة الأسبوع
+          لوحة البيانات
         </div>
         <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
           {range.label} · {range.compare}
@@ -22,11 +22,9 @@ export function Toolbar({ range }: { range: { label: string; compare: string } }
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div className="seg" role="group" aria-label="نطاق زمني">
           <button type="button" aria-pressed="false">اليوم</button>
-          <button type="button" aria-pressed="true">الأسبوع</button>
-          <button type="button" aria-pressed="false">الشهر</button>
+          <button type="button" aria-pressed="true">الشهر</button>
         </div>
         <button type="button" className="dash-btn">⤓ تصدير CSV</button>
-        <button type="button" className="dash-btn dash-btn-primary">⎙ تصدير PDF</button>
       </div>
     </div>
   );
