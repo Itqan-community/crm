@@ -242,13 +242,16 @@ async function backfillNewsletter(days: number): Promise<DailyRow[]> {
   const n = await getNewsletter();
   if (!n) return [];
 
-  // Email opens don't all happen on the send day — typical decay is
-  // ≈50% same day, falling off over the next week. MailerLite's API
-  // gives us only TOTAL opens per campaign (no per-day breakdown), so
-  // we redistribute that total using a standard industry curve. The
-  // sum stays equal to MailerLite's reported total; only the daily
-  // allocation is modelled. Indices = days since send (0 = send day).
-  const OPENS_DECAY = [0.50, 0.25, 0.12, 0.06, 0.03, 0.02, 0.01, 0.01];
+  // Email opens decay: ~50% same day, then a fast fall-off over the
+  // next week, with a thin 7-day tail. MailerLite's API gives us only
+  // TOTAL opens per campaign (no per-day breakdown), so we redistribute
+  // that total using a 14-day industry-typical curve. The sum stays
+  // equal to MailerLite's reported total; only the daily allocation is
+  // modelled. Indices = days since send (0 = send day).
+  const OPENS_DECAY = [
+    0.50, 0.25, 0.12, 0.05, 0.03, 0.02, 0.012,
+    0.008, 0.005, 0.003, 0.002, 0.001, 0.0005, 0.0005,
+  ];
 
   const windowStart = new Date(Date.now() - (days - 1) * 86_400_000);
   windowStart.setHours(0, 0, 0, 0);
@@ -271,9 +274,14 @@ async function backfillNewsletter(days: number): Promise<DailyRow[]> {
     byDay.set(k, cur);
   };
 
-  for (const c of n.recentCampaigns) {
-    if (!c.sentAt) continue;
-    const sendDate = new Date(c.sentAt);
+  // Sort campaigns oldest → newest so the "latest campaign rate" walk
+  // below sees them in chronological order.
+  const sorted = [...n.recentCampaigns]
+    .filter((c) => !!c.sentAt)
+    .sort((a, b) => (a.sentAt! < b.sentAt! ? -1 : 1));
+
+  for (const c of sorted) {
+    const sendDate = new Date(c.sentAt!);
     sendDate.setHours(0, 0, 0, 0);
 
     // Total opens — use API count if present, else derive from
@@ -292,11 +300,27 @@ async function backfillNewsletter(days: number): Promise<DailyRow[]> {
       const opensThisDay = Math.round(totalOpens * OPENS_DECAY[offset]);
       add(key, { opensDecayed: opensThisDay });
 
-      // Only the send day carries the campaign's metadata (sent + rate).
+      // Send day carries the campaign's metadata (sent + rate).
       if (offset === 0) {
         add(key, { sent: c.sent, sendCampaigns: 1, rateSum: c.openRate });
       }
     }
+  }
+
+  // Walk days oldest → newest and propagate the most recent non-zero
+  // campaign rate forward. So the "open rate" column on a non-send
+  // day reflects the latest active campaign's performance, instead
+  // of falsely reading as 0%.
+  const dayKeys = Array.from(byDay.keys()).sort();
+  let lastActiveRate = 0;
+  const dailyRate = new Map<string, number>();
+  for (const k of dayKeys) {
+    const agg = byDay.get(k)!;
+    if (agg.sendCampaigns > 0) {
+      const r = agg.rateSum / agg.sendCampaigns;
+      if (r > 0) lastActiveRate = r;
+    }
+    dailyRate.set(k, lastActiveRate);
   }
 
   return Array.from(byDay, ([day, agg]) => ({
@@ -304,10 +328,7 @@ async function backfillNewsletter(days: number): Promise<DailyRow[]> {
     metric_key: 'newsletter' as const,
     value: agg.sent,
     meta: {
-      rate:
-        agg.sendCampaigns > 0
-          ? Math.round((agg.rateSum / agg.sendCampaigns) * 10) / 10
-          : 0,
+      rate: Math.round((dailyRate.get(day) ?? 0) * 10) / 10,
       opened: agg.opensDecayed,
       prevRate: Math.round(n.last7Days.avgOpenRate * 10) / 10,
     },
