@@ -2,15 +2,21 @@ import { Toolbar } from './Toolbar';
 import { HeroBand } from './HeroBand';
 import { CommunitySection } from './CommunitySection';
 import { PlatformSection } from './PlatformSection';
+import { MetricsTable } from './MetricsTable';
 import type { DashboardData } from './types';
 import type { DashboardWindow } from '@/lib/dashboard/types';
+import type { EditableMetric } from '@/lib/dashboard/queries';
 
 export function Dashboard({
   data,
   window,
+  editable,
 }: {
   data: DashboardData;
   window: DashboardWindow;
+  // Only passed when the viewing user is an admin — gates the bottom
+  // metrics-edit table. Non-admins see the dashboard read-only.
+  editable?: EditableMetric[] | null;
 }) {
   return (
     // Negative margin escapes AdminLayout's <main className="p-4 md:p-6"> so
@@ -32,6 +38,7 @@ export function Dashboard({
           <HeroBand data={data} window={window} />
           <CommunitySection data={data.community} series={data.series} />
           <PlatformSection data={data.platform} series={data.series} window={window} />
+          {editable && editable.length > 0 && <MetricsTable metrics={editable} />}
         </div>
       </div>
     </div>

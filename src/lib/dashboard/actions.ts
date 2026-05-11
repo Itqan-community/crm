@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { SocialChannelKey } from './types';
+import { writeDailyRows, type MetricKey, type DailyRow } from './daily';
 
 async function requireAdmin() {
   const supabase = await createSupabaseServerClient();
@@ -75,4 +76,45 @@ export async function saveSocialSnapshot(input: SaveSocialInput) {
   // immediately after save.
   revalidatePath('/admin');
   revalidatePath('/admin/settings/metrics');
+}
+
+// ---- Weekly metrics editor --------------------------------------------------
+
+export type WeeklyMetricInput = {
+  day: string; // YYYY-MM-DD
+  metric_key: MetricKey;
+  value: number | string;
+  meta?: Record<string, number | string>;
+};
+
+// Bulk upsert from the MetricsTable on /admin. Sanitizes strings into
+// integers/floats (the form ships e.g. "12" not 12) and drops empty
+// meta fields so the jsonb stays minimal.
+export async function saveWeeklyMetrics(input: WeeklyMetricInput[]) {
+  await requireAdmin();
+  if (!Array.isArray(input) || input.length === 0) return { written: 0 };
+
+  const rows: DailyRow[] = input.map((row) => {
+    const meta: Record<string, number> = {};
+    for (const [k, v] of Object.entries(row.meta ?? {})) {
+      const n = toNumOrNull(v);
+      if (n != null) meta[k] = n;
+    }
+    return {
+      day: row.day,
+      metric_key: row.metric_key,
+      value: toNumOrNull(row.value) ?? 0,
+      meta,
+    };
+  });
+
+  const result = await writeDailyRows(rows);
+  revalidatePath('/admin');
+  return result;
+}
+
+function toNumOrNull(v: unknown): number | null {
+  if (v === '' || v == null) return null;
+  const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, ''));
+  return Number.isFinite(n) ? n : null;
 }

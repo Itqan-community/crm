@@ -1,6 +1,9 @@
-// Server-side queries for the manual-metrics admin form. Mirrors the
-// loader-side query in load.ts but returns rows in a simpler shape for
-// the editor (latest snapshot per channel).
+// Server-side queries for the admin editing surfaces. Two flavors:
+//   - loadSocialEditorRows: latest manual snapshot per social channel
+//     (drives /admin/settings/metrics SocialMetricsAdmin form).
+//   - loadCurrentWeekForEdit: every metric × every day of the current
+//     calendar week, ready to drop into the MetricsTable at the bottom
+//     of /admin.
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import {
@@ -8,6 +11,7 @@ import {
   type SocialSnapshot,
   DISPLAYED_CHANNELS,
 } from './types';
+import { ALL_METRIC_KEYS, type MetricKey } from './daily';
 
 export type SocialEditorRow = {
   channel: SocialChannelKey;
@@ -27,5 +31,159 @@ export async function loadSocialEditorRows(): Promise<SocialEditorRow[]> {
   return DISPLAYED_CHANNELS.map((channel) => ({
     channel,
     latest: byChannel.get(channel) ?? null,
+  }));
+}
+
+// ---- MetricsTable (bottom-of-dashboard editor) -----------------------------
+
+type MetaFieldDef = { key: string; label: string };
+
+export type MetricDef = {
+  metricKey: MetricKey;
+  label: string;
+  description: string;
+  valueLabel: string;
+  metaFields: MetaFieldDef[];
+};
+
+export type WeekDayCell = {
+  day: string; // YYYY-MM-DD
+  weekdayLabel: string; // أحد..سبت
+  isFuture: boolean;
+  value: number;
+  meta: Record<string, number>;
+};
+
+export type EditableMetric = MetricDef & { rows: WeekDayCell[] };
+
+// What each metric represents in plain Arabic — drives the table
+// labels and the descriptions the user reads when reviewing numbers.
+// Order matches the dashboard's reading order: community first, then
+// platform.
+export const METRIC_DEFINITIONS: MetricDef[] = [
+  {
+    metricKey: 'engagement',
+    label: 'تفاعل المجتمع',
+    description: 'مجموع التفاعلات اليومية في المنتدى (ردود + مناقشات + إعجابات + إشارات + مشاركات).',
+    valueLabel: 'المجموع',
+    metaFields: [
+      { key: 'replies',  label: 'ردود ومناقشات' },
+      { key: 'likes',    label: 'إعجابات' },
+      { key: 'mentions', label: 'إشارات وذكر' },
+      { key: 'shares',   label: 'مشاركات' },
+    ],
+  },
+  {
+    metricKey: 'newsletter',
+    label: 'النشرة البريدية',
+    description: 'بيانات آخر حملة بريدية أُرسلت في اليوم (من MailerLite).',
+    valueLabel: 'عدد المُرسَلين',
+    metaFields: [
+      { key: 'rate',     label: 'معدل الفتح (٪)' },
+      { key: 'opened',   label: 'عدد من فتحوا' },
+      { key: 'prevRate', label: 'متوسط فتح آخر 7 أيام (٪)' },
+    ],
+  },
+  {
+    metricKey: 'social_reach',
+    label: 'الوصول عبر الشبكات',
+    description: 'إجمالي مرات العرض/المشاهدة عبر LinkedIn + Facebook + X (يُحتسب من جدول لقطات الشبكات).',
+    valueLabel: 'الإجمالي',
+    metaFields: [],
+  },
+  {
+    metricKey: 'site_visits',
+    label: 'زيارات الموقع',
+    description: 'مشاهدات الصفحات من Google Analytics لـ itqan.dev.',
+    valueLabel: 'المشاهدات',
+    metaFields: [
+      { key: 'uniq',      label: 'زوار فريدون' },
+      { key: 'returning', label: 'زوار عائدون' },
+    ],
+  },
+  {
+    metricKey: 'publishers',
+    label: 'الناشرون',
+    description: 'العدد التراكمي للناشرين على المنصة كما بنهاية اليوم (CMS — publishers_publisher).',
+    valueLabel: 'العدد الكلي',
+    metaFields: [],
+  },
+  {
+    metricKey: 'beneficiaries',
+    label: 'المستفيدون',
+    description: 'العدد التراكمي للمستخدمين على المنصة كما بنهاية اليوم (CMS — users_user).',
+    valueLabel: 'العدد الكلي',
+    metaFields: [],
+  },
+  {
+    metricKey: 'consumption',
+    label: 'استهلاك المواد',
+    description: 'العدد التراكمي للأصول المنشورة كما بنهاية اليوم (CMS — content_asset). يُستخدم بديلاً عن مقاييس Mixpanel.',
+    valueLabel: 'العدد الكلي',
+    metaFields: [],
+  },
+  {
+    metricKey: 'shares',
+    label: 'مشاركات المجتمع',
+    description: 'إجمالي الإعجابات في المنتدى كما بنهاية اليوم (Flarum — post_likes).',
+    valueLabel: 'الإجمالي',
+    metaFields: [],
+  },
+];
+
+// Sunday-first weekday labels, matching the chart and the metrics
+// table column order. days[0]=أحد lands on the right edge in RTL.
+const DAY_LABELS = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت'];
+
+// Returns the current calendar week (Sun..Sat) with every metric's
+// stored value + meta for each day. Missing rows default to 0/{} so
+// the table always has a complete grid to render.
+export async function loadCurrentWeekForEdit(): Promise<EditableMetric[]> {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const dow = today.getDay();
+  const sunday = new Date(today);
+  sunday.setDate(today.getDate() - dow);
+
+  // Build the 7-day Sun→Sat range.
+  const days: Array<{ date: string; label: string; isFuture: boolean }> = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(sunday);
+    d.setDate(sunday.getDate() + i);
+    days.push({
+      date: d.toISOString().slice(0, 10),
+      label: DAY_LABELS[i],
+      isFuture: d > today,
+    });
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data } = await supabase
+    .from('dashboard_metric_daily')
+    .select('day, metric_key, value, meta')
+    .gte('day', days[0].date)
+    .lte('day', days[6].date);
+
+  // Index by "day|metric_key" for O(1) lookups when filling cells.
+  const byKey = new Map<string, { value: number; meta: Record<string, number> }>();
+  for (const row of data ?? []) {
+    byKey.set(`${row.day}|${row.metric_key}`, {
+      value: Number(row.value),
+      meta: (row.meta as Record<string, number>) ?? {},
+    });
+  }
+
+  return METRIC_DEFINITIONS.filter((def) => ALL_METRIC_KEYS.includes(def.metricKey)).map((def) => ({
+    ...def,
+    rows: days.map((d) => {
+      const stored = byKey.get(`${d.date}|${def.metricKey}`);
+      return {
+        day: d.date,
+        weekdayLabel: d.label,
+        isFuture: d.isFuture,
+        value: stored?.value ?? 0,
+        meta: stored?.meta ?? {},
+      };
+    }),
   }));
 }
