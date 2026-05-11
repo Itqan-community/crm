@@ -238,37 +238,65 @@ async function backfillSocialReach(days: number): Promise<DailyRow[]> {
 
 async function backfillNewsletter(days: number): Promise<DailyRow[]> {
   if (!STATS_ENV.MAILERLITE_API_KEY) return [];
-  // Lift the existing single-window source — it already returns
-  // recentCampaigns ordered newest-first. Each campaign has its own
-  // sent_at; we bucket those into per-day rows. Days with no send
-  // get NO row (gap in the line), since "0 sent" would lie when the
-  // truth is "no campaign that day".
   const { getNewsletter } = await import('@/lib/stats/sources/mailerlite');
   const n = await getNewsletter();
   if (!n) return [];
 
-  const cutoff = new Date(Date.now() - days * 86_400_000);
-  const byDay = new Map<
-    string,
-    { sent: number; opens: number; rateSum: number; campaigns: number }
-  >();
+  // Email opens don't all happen on the send day — typical decay is
+  // ≈50% same day, falling off over the next week. MailerLite's API
+  // gives us only TOTAL opens per campaign (no per-day breakdown), so
+  // we redistribute that total using a standard industry curve. The
+  // sum stays equal to MailerLite's reported total; only the daily
+  // allocation is modelled. Indices = days since send (0 = send day).
+  const OPENS_DECAY = [0.50, 0.25, 0.12, 0.06, 0.03, 0.02, 0.01, 0.01];
+
+  const windowStart = new Date(Date.now() - (days - 1) * 86_400_000);
+  windowStart.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  type Agg = {
+    sent: number;
+    sendCampaigns: number;
+    rateSum: number;
+    opensDecayed: number;
+  };
+  const byDay = new Map<string, Agg>();
+  const add = (k: string, patch: Partial<Agg>) => {
+    const cur = byDay.get(k) ?? { sent: 0, sendCampaigns: 0, rateSum: 0, opensDecayed: 0 };
+    cur.sent += patch.sent ?? 0;
+    cur.sendCampaigns += patch.sendCampaigns ?? 0;
+    cur.rateSum += patch.rateSum ?? 0;
+    cur.opensDecayed += patch.opensDecayed ?? 0;
+    byDay.set(k, cur);
+  };
+
   for (const c of n.recentCampaigns) {
     if (!c.sentAt) continue;
-    const sent = new Date(c.sentAt);
-    if (sent < cutoff) continue;
-    const k = c.sentAt.slice(0, 10);
-    // MailerLite's /campaigns list response carries `open_rate.float`
-    // (a 0..1 ratio) but often omits the raw `unique_opens_count`. If
-    // c.opens is 0 while c.openRate is non-zero, derive the count
-    // from sent × rate — same number the rate was computed from.
-    const opens =
+    const sendDate = new Date(c.sentAt);
+    sendDate.setHours(0, 0, 0, 0);
+
+    // Total opens — use API count if present, else derive from
+    // sent × rate (MailerLite list endpoint often omits the count).
+    const totalOpens =
       c.opens > 0 ? c.opens : Math.round((c.sent * c.openRate) / 100);
-    const agg = byDay.get(k) ?? { sent: 0, opens: 0, rateSum: 0, campaigns: 0 };
-    agg.sent += c.sent;
-    agg.opens += opens;
-    agg.rateSum += c.openRate;
-    agg.campaigns += 1;
-    byDay.set(k, agg);
+
+    // Distribute totalOpens across OPENS_DECAY.length days starting
+    // from sendDate. Only rows whose event-day falls inside our
+    // window get written.
+    for (let offset = 0; offset < OPENS_DECAY.length; offset++) {
+      const eventDate = new Date(sendDate);
+      eventDate.setDate(sendDate.getDate() + offset);
+      if (eventDate < windowStart || eventDate > today) continue;
+      const key = eventDate.toISOString().slice(0, 10);
+      const opensThisDay = Math.round(totalOpens * OPENS_DECAY[offset]);
+      add(key, { opensDecayed: opensThisDay });
+
+      // Only the send day carries the campaign's metadata (sent + rate).
+      if (offset === 0) {
+        add(key, { sent: c.sent, sendCampaigns: 1, rateSum: c.openRate });
+      }
+    }
   }
 
   return Array.from(byDay, ([day, agg]) => ({
@@ -276,11 +304,11 @@ async function backfillNewsletter(days: number): Promise<DailyRow[]> {
     metric_key: 'newsletter' as const,
     value: agg.sent,
     meta: {
-      rate: agg.campaigns > 0 ? Math.round((agg.rateSum / agg.campaigns) * 10) / 10 : 0,
-      opened: agg.opens,
-      // prevRate carries the rolling 7-day average from the live
-      // newsletter object — same for every backfilled row, the ring
-      // card uses it as the "compared to" baseline.
+      rate:
+        agg.sendCampaigns > 0
+          ? Math.round((agg.rateSum / agg.sendCampaigns) * 10) / 10
+          : 0,
+      opened: agg.opensDecayed,
       prevRate: Math.round(n.last7Days.avgOpenRate * 10) / 10,
     },
   }));
