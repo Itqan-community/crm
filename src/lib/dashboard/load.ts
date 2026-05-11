@@ -10,6 +10,7 @@ import { loadStatsBundle } from '@/lib/stats/loader';
 import type { StatsBundle } from '@/lib/stats/types';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { DashboardData } from '@/components/admin/dashboard/types';
+import { loadAllSeries, type MetricKey } from './daily';
 import {
   type DashboardWindow,
   type SocialSnapshot,
@@ -25,11 +26,12 @@ const DAY_LABELS_AR = ['إثن', 'ثلا', 'أرب', 'خمي', 'جمع', 'سبت
 // gated by the slowest of (a) stats bundle, (b) Supabase social query.
 export async function loadDashboardData(window: DashboardWindow): Promise<DashboardData> {
   const days = WINDOW_DAYS[window];
-  const [bundle, socialByChannel] = await Promise.all([
+  const [bundle, socialByChannel, dailySeries] = await Promise.all([
     loadStatsBundle({ windowDays: days }),
     loadLatestSocialSnapshots(),
+    loadAllSeries(7),
   ]);
-  return mapBundle(bundle, socialByChannel, window);
+  return mapBundle(bundle, socialByChannel, dailySeries, window);
 }
 
 // Latest snapshot per channel — DISTINCT ON would be cleaner but we
@@ -54,6 +56,7 @@ async function loadLatestSocialSnapshots(): Promise<Map<SocialChannelKey, Social
 function mapBundle(
   bundle: StatsBundle,
   social: Map<SocialChannelKey, SocialSnapshot>,
+  daily: Record<MetricKey, { now: number[]; prev: number[] }>,
   window: DashboardWindow,
 ): DashboardData {
   const days = WINDOW_DAYS[window];
@@ -71,7 +74,16 @@ function mapBundle(
       consumption: mapConsumption(bundle),
       shares: mapShares(bundle),
     },
-    series: emptySeries(days),
+    series: {
+      newsletter:    daily.newsletter,
+      engagement:    daily.engagement,
+      socialReach:   daily.social_reach,
+      siteVisits:    daily.site_visits,
+      publishers:    daily.publishers,
+      beneficiaries: daily.beneficiaries,
+      consumption:   daily.consumption,
+      shares:        daily.shares,
+    },
     days: dayLabels(days),
   };
 }
@@ -233,22 +245,6 @@ function mapShares(bundle: StatsBundle): DashboardData['platform']['shares'] {
   const f = bundle.forum;
   if (!f) return { value: 0, delta: 0 };
   return { value: f.totalLikes ?? 0, delta: 0 };
-}
-
-// Empty 7-day series — sparklines render as flat lines. Real series
-// require a daily-snapshot job (see TODO in dashboard plan).
-function emptySeries(_days: number): DashboardData['series'] {
-  const flat = () => ({ now: [0, 0, 0, 0, 0, 0, 0], prev: [0, 0, 0, 0, 0, 0, 0] });
-  return {
-    newsletter: flat(),
-    engagement: flat(),
-    socialReach: flat(),
-    siteVisits: flat(),
-    publishers: flat(),
-    beneficiaries: flat(),
-    consumption: flat(),
-    shares: flat(),
-  };
 }
 
 function dayLabels(days: number): string[] {

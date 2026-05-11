@@ -1,6 +1,7 @@
 import { requireAdminPage } from '@/lib/admin-guard';
 import { AdminOnlyNotice } from '@/components/admin/AdminOnlyNotice';
 import { SocialMetricsAdmin } from '@/components/admin/dashboard/SocialMetricsAdmin';
+import { BackfillButton } from '@/components/admin/dashboard/BackfillButton';
 import { loadSocialEditorRows } from '@/lib/dashboard/queries';
 
 export const dynamic = 'force-dynamic';
@@ -23,6 +24,7 @@ export default async function MetricsSettingsPage() {
       </div>
 
       <SocialMetricsAdmin rows={rows} />
+      <BackfillButton days={30} />
     </div>
   );
 }
