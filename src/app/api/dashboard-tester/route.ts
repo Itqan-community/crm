@@ -58,6 +58,50 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  if (action === 'campaigns') {
+    // Returns the raw campaign list from MailerLite alongside the
+    // numbers we derive from it — so the user can see the source
+    // values directly and decide whether the dashboard's daily
+    // opens distribution is honest.
+    try {
+      const { getNewsletter } = await import('@/lib/stats/sources/mailerlite');
+      const n = await getNewsletter();
+      if (!n) {
+        return NextResponse.json({
+          ok: true,
+          action: 'campaigns',
+          configured: false,
+          hint: 'mailerlite_API_KEY is not set; nothing to fetch.',
+        });
+      }
+      return NextResponse.json({
+        ok: true,
+        action: 'campaigns',
+        configured: true,
+        activeSubscribers: n.activeSubscribers,
+        last7Days: n.last7Days,
+        lastCampaign: n.lastCampaign,
+        recentCampaigns: n.recentCampaigns.map((c) => ({
+          id: c.id,
+          name: c.name,
+          subject: c.subject,
+          sentAt: c.sentAt,
+          sent: c.sent,
+          opens_raw: c.opens, // unique_opens_count from MailerLite
+          opens_derived_from_rate: Math.round((c.sent * c.openRate) / 100),
+          openRate_pct: c.openRate,
+          clicks: c.clicks,
+          clickRate_pct: c.clickRate,
+        })),
+      });
+    } catch (e) {
+      return NextResponse.json(
+        { ok: false, action: 'campaigns', error: e instanceof Error ? e.message : String(e) },
+        { status: 500 },
+      );
+    }
+  }
+
   if (action === 'capture') {
     try {
       const written = await captureToday();
