@@ -257,9 +257,15 @@ async function backfillNewsletter(days: number): Promise<DailyRow[]> {
     const sent = new Date(c.sentAt);
     if (sent < cutoff) continue;
     const k = c.sentAt.slice(0, 10);
+    // MailerLite's /campaigns list response carries `open_rate.float`
+    // (a 0..1 ratio) but often omits the raw `unique_opens_count`. If
+    // c.opens is 0 while c.openRate is non-zero, derive the count
+    // from sent × rate — same number the rate was computed from.
+    const opens =
+      c.opens > 0 ? c.opens : Math.round((c.sent * c.openRate) / 100);
     const agg = byDay.get(k) ?? { sent: 0, opens: 0, rateSum: 0, campaigns: 0 };
     agg.sent += c.sent;
-    agg.opens += c.opens;
+    agg.opens += opens;
     agg.rateSum += c.openRate;
     agg.campaigns += 1;
     byDay.set(k, agg);

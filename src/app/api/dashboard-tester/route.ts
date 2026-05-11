@@ -128,11 +128,13 @@ async function captureToday(): Promise<{ written: number; day: string }> {
   }
   if (bundle.newsletter?.lastCampaign) {
     const c = bundle.newsletter.lastCampaign;
+    const opens =
+      c.opens > 0 ? c.opens : Math.round((c.sent * c.openRate) / 100);
     rows.push({
       day,
       metric_key: 'newsletter',
       value: c.sent,
-      meta: { rate: c.openRate, prevRate: bundle.newsletter.last7Days.avgOpenRate, opened: c.opens },
+      meta: { rate: c.openRate, prevRate: bundle.newsletter.last7Days.avgOpenRate, opened: opens },
     });
   }
   if (bundle.analytics) {

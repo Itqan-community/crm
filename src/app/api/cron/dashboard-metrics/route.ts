@@ -70,6 +70,10 @@ export async function GET(request: NextRequest) {
   }
   if (bundle.newsletter?.lastCampaign) {
     const c = bundle.newsletter.lastCampaign;
+    // MailerLite's list response sometimes omits unique_opens_count
+    // while still returning open_rate. Fall back to sent × rate.
+    const opens =
+      c.opens > 0 ? c.opens : Math.round((c.sent * c.openRate) / 100);
     rows.push({
       day,
       metric_key: 'newsletter',
@@ -80,7 +84,7 @@ export async function GET(request: NextRequest) {
       meta: {
         rate: c.openRate,
         prevRate: bundle.newsletter.last7Days.avgOpenRate,
-        opened: c.opens,
+        opened: opens,
       },
     });
   }
