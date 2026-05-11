@@ -89,16 +89,24 @@ async function backfillForum(days: number): Promise<DailyRow[]> {
       [startDate],
     )) as unknown as [Row[]];
 
-    const byDay = new Map<string, number>();
-    for (const r of [...posts, ...discussions]) {
-      const day = normalizeDay(r.day);
-      byDay.set(day, (byDay.get(day) ?? 0) + Number(r.cnt));
-    }
+    // Track posts and discussions separately so we can populate the
+    // breakdown meta — "ردود ومناقشات" combines both. Likes /
+    // mentions / shares aren't tracked yet, so they sit at 0.
+    const byDay = new Map<string, { value: number; replies: number }>();
+    const addToDay = (day: string, n: number) => {
+      const cur = byDay.get(day) ?? { value: 0, replies: 0 };
+      cur.value += n;
+      cur.replies += n;
+      byDay.set(day, cur);
+    };
+    for (const r of posts) addToDay(normalizeDay(r.day), Number(r.cnt));
+    for (const r of discussions) addToDay(normalizeDay(r.day), Number(r.cnt));
 
-    return Array.from(byDay, ([day, value]) => ({
+    return Array.from(byDay, ([day, agg]) => ({
       day,
       metric_key: 'engagement' as const,
-      value,
+      value: agg.value,
+      meta: { replies: agg.replies, likes: 0, mentions: 0, shares: 0 },
     }));
   } finally {
     await conn.end().catch(() => {});
@@ -122,14 +130,17 @@ async function backfillCms(days: number): Promise<DailyRow[]> {
   await client.connect();
 
   try {
-    // For each day in the window, the values are cumulative counts of
-    // rows whose created_at falls on or before that day. A single
-    // CTE-based query handles all three metrics — much cheaper than
-    // 30 round-trips.
+    // For each day in the window:
+    //   value      = cumulative count of rows where created_at ≤ day
+    //   new_30d    = count of rows created in the 30 days ending on day
+    // One CTE-based query handles all three metrics for all N days —
+    // much cheaper than 30 × 3 round-trips.
     const { rows } = await client.query<{
       day: string;
       publishers: string;
+      publishers_new30: string;
       beneficiaries: string;
+      beneficiaries_new30: string;
       consumption: string;
     }>(
       `WITH day_series AS (
@@ -142,8 +153,10 @@ async function backfillCms(days: number): Promise<DailyRow[]> {
        SELECT
          to_char(d.day, 'YYYY-MM-DD') AS day,
          (SELECT COUNT(*) FROM publishers_publisher WHERE created_at <= d.day + interval '1 day')::text AS publishers,
-         (SELECT COUNT(*) FROM users_user        WHERE created_at <= d.day + interval '1 day')::text AS beneficiaries,
-         (SELECT COUNT(*) FROM content_asset     WHERE created_at <= d.day + interval '1 day')::text AS consumption
+         (SELECT COUNT(*) FROM publishers_publisher WHERE created_at >  d.day - interval '29 days' AND created_at <= d.day + interval '1 day')::text AS publishers_new30,
+         (SELECT COUNT(*) FROM users_user           WHERE created_at <= d.day + interval '1 day')::text AS beneficiaries,
+         (SELECT COUNT(*) FROM users_user           WHERE created_at >  d.day - interval '29 days' AND created_at <= d.day + interval '1 day')::text AS beneficiaries_new30,
+         (SELECT COUNT(*) FROM content_asset        WHERE created_at <= d.day + interval '1 day')::text AS consumption
        FROM day_series d
        ORDER BY d.day`,
       [days],
@@ -151,9 +164,23 @@ async function backfillCms(days: number): Promise<DailyRow[]> {
 
     const out: DailyRow[] = [];
     for (const r of rows) {
-      out.push({ day: r.day, metric_key: 'publishers',    value: Number(r.publishers) });
-      out.push({ day: r.day, metric_key: 'beneficiaries', value: Number(r.beneficiaries) });
-      out.push({ day: r.day, metric_key: 'consumption',   value: Number(r.consumption) });
+      out.push({
+        day: r.day,
+        metric_key: 'publishers',
+        value: Number(r.publishers),
+        meta: { new_30d: Number(r.publishers_new30) },
+      });
+      out.push({
+        day: r.day,
+        metric_key: 'beneficiaries',
+        value: Number(r.beneficiaries),
+        meta: { new_30d: Number(r.beneficiaries_new30) },
+      });
+      out.push({
+        day: r.day,
+        metric_key: 'consumption',
+        value: Number(r.consumption),
+      });
     }
     return out;
   } finally {

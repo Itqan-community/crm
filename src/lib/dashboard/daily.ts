@@ -27,7 +27,32 @@ export const ALL_METRIC_KEYS: MetricKey[] = [
   'shares',
 ];
 
-export type DailyRow = { day: string; metric_key: MetricKey; value: number };
+// Per-metric sub-fields the dashboard cares about. Stored in the
+// `meta` jsonb column alongside the headline value so /admin can
+// render the full surface from a single internal query — no live
+// source hits in the hot path.
+export type MetricMeta = {
+  newsletter?: { rate?: number; prevRate?: number; opened?: number };
+  site_visits?: { uniq?: number; returning?: number };
+  engagement?: { replies?: number; likes?: number; mentions?: number; shares?: number };
+  consumption?: { reads?: number; downloads?: number; listens?: number; shares?: number };
+  publishers?: { new_30d?: number };
+  beneficiaries?: { new_30d?: number };
+};
+
+export type DailyRow = {
+  day: string;
+  metric_key: MetricKey;
+  value: number;
+  meta?: Record<string, unknown>;
+};
+
+export type LatestSnapshot = {
+  value: number;
+  delta: number;
+  previousValue: number;
+  meta: Record<string, unknown>;
+};
 
 // Read the last 2N days of a metric and split into now / prev so the
 // chart can render both lines. Returns empty arrays when there isn't
@@ -70,11 +95,56 @@ export async function loadAllSeries(days = 7): Promise<Record<MetricKey, { now: 
 export async function writeDailyRows(rows: DailyRow[]): Promise<{ written: number }> {
   if (rows.length === 0) return { written: 0 };
   const supabase = await createSupabaseServerClient();
+  // Normalize each row so meta always lands as an object (not undefined)
+  // — keeps the DB default behaviour predictable.
+  const normalized = rows.map((r) => ({ ...r, meta: r.meta ?? {} }));
   const { error } = await supabase
     .from('dashboard_metric_daily')
-    .upsert(rows, { onConflict: 'day,metric_key' });
+    .upsert(normalized, { onConflict: 'day,metric_key' });
   if (error) throw new Error(error.message);
   return { written: rows.length };
+}
+
+// Pull the latest snapshot per metric plus the row from `offsetDays`
+// ago so the adapter can compute deltas. Single query — feeds the
+// entire dashboard without touching live sources.
+export async function loadLatestSnapshots(offsetDays: number): Promise<Map<MetricKey, LatestSnapshot>> {
+  const supabase = await createSupabaseServerClient();
+  // Cap the fetch at offset + a buffer so we don't pull the whole
+  // table when daily history grows past 30 days. 8 metrics × ~40 days
+  // is still tiny.
+  const { data } = await supabase
+    .from('dashboard_metric_daily')
+    .select('day, metric_key, value, meta')
+    .order('day', { ascending: false })
+    .limit((offsetDays + 5) * ALL_METRIC_KEYS.length);
+  const byMetric = new Map<MetricKey, Array<{ value: number; meta: Record<string, unknown> }>>();
+  for (const row of data ?? []) {
+    const key = row.metric_key as MetricKey;
+    if (!byMetric.has(key)) byMetric.set(key, []);
+    byMetric.get(key)!.push({
+      value: Number(row.value),
+      meta: (row.meta as Record<string, unknown>) ?? {},
+    });
+  }
+  const out = new Map<MetricKey, LatestSnapshot>();
+  for (const [k, rows] of byMetric) {
+    const latest = rows[0];
+    // Pick the row offsetDays back if it exists; otherwise the oldest
+    // we have (the delta narrows to "since the table started").
+    const previous = rows[Math.min(rows.length - 1, offsetDays)] ?? latest;
+    const delta =
+      previous.value > 0
+        ? ((latest.value - previous.value) / previous.value) * 100
+        : 0;
+    out.set(k, {
+      value: latest.value,
+      previousValue: previous.value,
+      delta: Math.round(delta * 10) / 10,
+      meta: latest.meta,
+    });
+  }
+  return out;
 }
 
 // Today as YYYY-MM-DD in the server's local TZ. Good enough — the

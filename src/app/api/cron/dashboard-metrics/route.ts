@@ -52,10 +52,15 @@ export async function GET(request: NextRequest) {
   const rows: DailyRow[] = [];
 
   if (bundle.forum) {
+    const replies = (bundle.forum.newPosts ?? 0) + (bundle.forum.newDiscussions ?? 0);
     rows.push({
       day,
       metric_key: 'engagement',
-      value: (bundle.forum.newPosts ?? 0) + (bundle.forum.newDiscussions ?? 0),
+      value: replies,
+      // Breakdown we can populate from forum: replies+discussions
+      // count as "ردود ومناقشات". Likes/mentions/shares aren't
+      // tracked yet — leave them at 0 until a source surfaces them.
+      meta: { replies, likes: 0, mentions: 0, shares: 0 },
     });
     rows.push({
       day,
@@ -64,26 +69,47 @@ export async function GET(request: NextRequest) {
     });
   }
   if (bundle.newsletter?.lastCampaign) {
-    // Newsletter is bursty (only on send days). Capturing the most
-    // recent campaign's send count keeps the line meaningful — non-send
-    // days carry over the last reading, which is what teams expect.
+    const c = bundle.newsletter.lastCampaign;
     rows.push({
       day,
       metric_key: 'newsletter',
-      value: bundle.newsletter.lastCampaign.sent,
+      value: c.sent,
+      // Headline UI shows the open rate as a ring, so we stash it
+      // alongside the sent count to avoid querying MailerLite again
+      // from /admin.
+      meta: {
+        rate: c.openRate,
+        prevRate: bundle.newsletter.last7Days.avgOpenRate,
+        opened: c.opens,
+      },
     });
   }
   if (bundle.analytics) {
+    const a = bundle.analytics;
     rows.push({
       day,
       metric_key: 'site_visits',
-      value: bundle.analytics.pageviews.value,
+      value: a.pageviews.value,
+      meta: {
+        uniq: a.activeUsers.value,
+        returning: Math.max(0, a.sessions.value - a.newUsers),
+      },
     });
   }
   if (bundle.cms) {
-    rows.push({ day, metric_key: 'publishers',    value: bundle.cms.totalPublishers });
-    rows.push({ day, metric_key: 'beneficiaries', value: bundle.cms.totalUsers });
-    rows.push({ day, metric_key: 'consumption',   value: bundle.cms.totalAssets });
+    rows.push({
+      day,
+      metric_key: 'publishers',
+      value: bundle.cms.totalPublishers,
+      meta: { new_30d: bundle.cms.newPublishers30d },
+    });
+    rows.push({
+      day,
+      metric_key: 'beneficiaries',
+      value: bundle.cms.totalUsers,
+      meta: { new_30d: bundle.cms.newUsers30d },
+    });
+    rows.push({ day, metric_key: 'consumption', value: bundle.cms.totalAssets });
   }
 
   // social_reach derives from the manual snapshots table. The cron
