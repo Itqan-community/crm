@@ -3,6 +3,14 @@
 // sparklines.
 
 import { createSupabaseServerClient } from '@/lib/supabase/server';
+import {
+  addDays,
+  addWeeks,
+  dateKey,
+  endOfKsaWeek,
+  startOfKsaWeek,
+  type PeriodRange,
+} from './calendar';
 
 // Snake-case keys to match column convention. The adapter (load.ts)
 // maps these to the camelCase DashboardData series names.
@@ -135,57 +143,80 @@ export async function writeDailyRows(
   return { written: rowsToWrite.length, skippedManual };
 }
 
-// Window-aware aggregation. For each metric the value/delta semantics
-// follow METRIC_SEMANTIC:
-//   - flow:       value = Σ last windowDays daily readings.
-//                 previousValue = Σ the windowDays before that.
+// Period-aware aggregation. The toolbar picks a SPECIFIC period via
+// the URL (?window=&date=YYYY-MM-DD), and we report values scoped to
+// that period — not the trailing-N-days from today. Semantics:
+//   - flow:       value = Σ rows whose day ∈ [current.start, current.end].
+//                 previousValue = same Σ over the previous period.
 //                 meta = per-field sum of those daily metas.
-//   - cumulative: value = latest reading (today's row).
-//                 previousValue = the row from windowDays ago.
-//                 meta = latest reading's meta (rates are point-in-time).
-// One Supabase round-trip drives the whole dashboard.
-export async function loadLatestSnapshots(windowDays: number): Promise<Map<MetricKey, LatestSnapshot>> {
+//   - cumulative: value = latest reading on or before current.end.
+//                 previousValue = latest reading on or before previous.end.
+//                 meta = the current reading's meta (rates etc).
+//
+// One Supabase round-trip pulls rows over the combined (previous.start ..
+// current.end) range with a small earlier-window padding so cumulative
+// metrics can find a fallback reading before the start of `previous`.
+export async function loadLatestSnapshots(
+  current: PeriodRange,
+  previous: PeriodRange,
+): Promise<Map<MetricKey, LatestSnapshot>> {
   const supabase = await createSupabaseServerClient();
-  // Pull enough daily rows to cover this window AND the previous one
-  // (for the delta comparison). +5 buffers against gaps.
-  const rowsPerMetric = windowDays * 2 + 5;
+  // Pad the earlier end of the lookup by ~30 days so cumulative
+  // fallback (latest row <= period end) still resolves when the
+  // period falls before our first snapshot.
+  const fromKey = dateKey(addDays(previous.start, -30));
+  const toKey = dateKey(current.end);
   const { data, error } = await supabase
     .from('dashboard_metric_daily')
     .select('day, metric_key, value, meta')
-    .order('day', { ascending: false })
-    .limit(rowsPerMetric * ALL_METRIC_KEYS.length);
+    .gte('day', fromKey)
+    .lte('day', toKey)
+    .order('day', { ascending: false });
   if (error) throw new Error(`loadLatestSnapshots failed: ${error.message}`);
-  const byMetric = new Map<MetricKey, Array<{ value: number; meta: Record<string, unknown> }>>();
+
+  const byMetric = new Map<
+    MetricKey,
+    Array<{ day: string; value: number; meta: Record<string, unknown> }>
+  >();
   for (const row of data ?? []) {
-    const key = row.metric_key as MetricKey;
-    if (!byMetric.has(key)) byMetric.set(key, []);
-    byMetric.get(key)!.push({
+    const k = row.metric_key as MetricKey;
+    if (!byMetric.has(k)) byMetric.set(k, []);
+    byMetric.get(k)!.push({
+      day: row.day as string,
       value: Number(row.value),
       meta: (row.meta as Record<string, unknown>) ?? {},
     });
   }
+
+  const curStart = dateKey(current.start);
+  const curEnd = dateKey(current.end);
+  const prevStart = dateKey(previous.start);
+  const prevEnd = dateKey(previous.end);
+
   const out = new Map<MetricKey, LatestSnapshot>();
-  for (const [k, rows] of byMetric) {
+  // Make sure every metric we know about gets a snapshot — even ones
+  // with no rows yet, so the UI doesn't render a card with missing
+  // fields. Zero-fill with no meta.
+  for (const k of ALL_METRIC_KEYS) {
+    const rows = byMetric.get(k) ?? [];
     const sem = METRIC_SEMANTIC[k];
-    const nowRows = rows.slice(0, windowDays);
-    const prevRows = rows.slice(windowDays, windowDays * 2);
 
     let value: number;
     let previousValue: number;
     let meta: Record<string, unknown>;
     if (sem === 'flow') {
-      value = nowRows.reduce((s, r) => s + r.value, 0);
-      previousValue = prevRows.reduce((s, r) => s + r.value, 0);
-      meta = sumMetaNumbers(nowRows.map((r) => r.meta));
+      const inCur = rows.filter((r) => r.day >= curStart && r.day <= curEnd);
+      const inPrev = rows.filter((r) => r.day >= prevStart && r.day <= prevEnd);
+      value = inCur.reduce((s, r) => s + r.value, 0);
+      previousValue = inPrev.reduce((s, r) => s + r.value, 0);
+      meta = sumMetaNumbers(inCur.map((r) => r.meta));
     } else {
-      // Cumulative: latest reading is current state; the reading from
-      // windowDays ago is what we compare against. If we have less
-      // history than that, fall back to the oldest row we do have so
-      // the delta narrows toward 0 instead of crashing.
-      value = nowRows[0]?.value ?? 0;
-      previousValue =
-        prevRows[0]?.value ?? rows[rows.length - 1]?.value ?? 0;
-      meta = nowRows[0]?.meta ?? {};
+      // rows are already day-DESC, so .find() gives the latest match.
+      const curLatest = rows.find((r) => r.day <= curEnd);
+      const prevLatest = rows.find((r) => r.day <= prevEnd);
+      value = curLatest?.value ?? 0;
+      previousValue = prevLatest?.value ?? 0;
+      meta = curLatest?.meta ?? {};
     }
 
     const delta = previousValue > 0 ? ((value - previousValue) / previousValue) * 100 : 0;
@@ -217,29 +248,26 @@ function sumMetaNumbers(metas: Array<Record<string, unknown>>): Record<string, n
 // visual-right. Pairing this with Sunday-first labels rendered in
 // an RTL flex row puts أحد on the right edge of both the labels
 // and the data — week starts on Sunday as Arabic readers expect.
-export async function loadCalendarWeekSeries(): Promise<
-  Record<MetricKey, { now: number[]; prev: number[] }>
-> {
+export async function loadCalendarWeekSeries(
+  anchor: Date,
+): Promise<Record<MetricKey, { now: number[]; prev: number[] }>> {
   const supabase = await createSupabaseServerClient();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const dow = today.getDay(); // 0 = Sunday
-  const sunday = new Date(today);
-  sunday.setDate(today.getDate() - dow);
-  const prevSunday = new Date(sunday);
-  prevSunday.setDate(sunday.getDate() - 7);
-  const saturday = new Date(sunday);
-  saturday.setDate(sunday.getDate() + 6);
+  // KSA Sun-Sat week containing the anchor (matches the picker
+  // contract — the toolbar already canonicalizes week anchors to a
+  // Sunday, so this is a no-op for week-window navigation; day-window
+  // navigation gets the containing week, which is what the user
+  // expects to see in the chart).
+  const sunday = startOfKsaWeek(anchor);
+  const saturday = endOfKsaWeek(anchor);
+  const prevSunday = addWeeks(sunday, -1);
 
-  const toKey = (d: Date) => d.toISOString().slice(0, 10);
   const { data, error } = await supabase
     .from('dashboard_metric_daily')
     .select('day, metric_key, value')
-    .gte('day', toKey(prevSunday))
-    .lte('day', toKey(saturday));
+    .gte('day', dateKey(prevSunday))
+    .lte('day', dateKey(saturday));
   if (error) throw new Error(`loadCalendarWeekSeries failed: ${error.message}`);
 
-  // index by metric → day → value
   const byMetricDay = new Map<MetricKey, Map<string, number>>();
   for (const row of data ?? []) {
     const k = row.metric_key as MetricKey;
@@ -255,13 +283,13 @@ export async function loadCalendarWeekSeries(): Promise<
     // dowIdx 6→0 = Sat→Sun, putting Sat at array[0] (SVG left) and
     // Sun at array[6] (SVG right = visual right in RTL parent).
     for (let dowIdx = 6; dowIdx >= 0; dowIdx--) {
-      const cur = new Date(sunday);
-      cur.setDate(sunday.getDate() + dowIdx);
-      const last = new Date(prevSunday);
-      last.setDate(prevSunday.getDate() + dowIdx);
+      const cur = addDays(sunday, dowIdx);
+      const last = addDays(prevSunday, dowIdx);
       // Future days in the current week shouldn't fabricate a value.
-      now.push(cur > today ? 0 : byDay.get(toKey(cur)) ?? 0);
-      prev.push(byDay.get(toKey(last)) ?? 0);
+      const todayKey = dateKey(new Date());
+      const curKey = dateKey(cur);
+      now.push(curKey > todayKey ? 0 : byDay.get(curKey) ?? 0);
+      prev.push(byDay.get(dateKey(last)) ?? 0);
     }
     result[k] = { now, prev };
   }

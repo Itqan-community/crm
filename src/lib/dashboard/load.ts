@@ -60,15 +60,18 @@ export async function loadDashboardData(
   window: DashboardWindow,
   anchorKey?: string,
 ): Promise<DashboardData> {
-  const windowDays = WINDOW_DAYS[window];
   const anchor =
     (anchorKey ? fromDateKey(anchorKey) : null) ?? defaultAnchor(window);
   const current = periodRange(window, anchor);
   const previous = previousPeriodRange(current);
   const [snapshots, socialByChannel, series] = await Promise.all([
-    loadLatestSnapshots(windowDays),
+    loadLatestSnapshots(current, previous),
     loadLatestSocialSnapshots(),
-    loadCalendarWeekSeries(),
+    // Chart shows the calendar week (Sun-Sat) containing the anchor.
+    // For week-window this IS the period; for day-window the user
+    // sees the day-in-context; for month-window we render the week
+    // containing the period's start (1st of month).
+    loadCalendarWeekSeries(anchor),
   ]);
   return buildDashboard(snapshots, socialByChannel, series, window, current, previous);
 }
