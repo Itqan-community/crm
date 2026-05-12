@@ -58,15 +58,19 @@ Metric keys + what `value` means:
 ## Open work
 
 1. **CRON_SECRET** in Vercel — confirm it's set so the daily cron + tester endpoint authorize. Verify by hitting `/api/dashboard-tester` with the token.
-2. **CMS metrics (publishers / beneficiaries / consumption) still show 0 rows.** The CMS env var (`stat_app_CMS_DB_URL`) may be missing OR the connection fails. Diagnose via `/admin/stats` page (built in PR #28) which shows per-source config + errors.
-3. **MailerLite webhooks for real-time per-day opens** — proposed but not implemented. CSV import gave us historical, but going forward we'd need either: (a) repeat CSV uploads, (b) `campaign.open` webhook → store events → aggregate per day, (c) accept that historical is real and going-forward is the decay estimate.
+2. **CMS metrics (publishers / beneficiaries / consumption) still show 0 rows.** The CMS env var (`stat_app_CMS_DB_URL`) is missing in Vercel OR the connection fails. `/admin/stats` now surfaces this in two places: the env-status banner shows ⚠ when the var is unset, and a per-source "days since last row" chip next to each source flags configured-but-no-rows situations (e.g. var set but TLS handshake failing). Once the var is set, click "إعادة ملء آخر 30 يوم" on `/admin/settings/metrics` to populate.
+3. **MailerLite per-day opens — decision: stick with periodic CSV import for now.** The webhook path (`campaign.open` → events table → daily aggregate) costs ~1d of work (webhook handler + events table + aggregation + idempotency keys) and trades one operational chore (CSV upload) for another (webhook monitoring). The decay-curve estimate is fine for the headline ring; CSV gives us truth for historical. Revisit if/when the CSV cadence becomes painful.
 4. **Other Vercel env vars** for GA / Flarum to populate `engagement`, `site_visits`, `shares` properly across all days (currently only what backfill captured at the moment of the click).
+
+### Engagement breakdown — what's tracked vs not
+
+After [b6d… engagement likes] the `engagement` metric now sums replies + discussions + likes (`post_likes` table in Flarum). `mentions` and `shares` remain 0 in meta — Flarum's mentions extension may or may not be installed (extension-table existence varies), and there's no native "share" event. If those become priorities, mentions can be pulled from `post_mentions_post` (extension); shares would need an outbound-share tracker (e.g. a UTM-tagged "share" link in the email template).
 
 ## How to continue in a new session
 
 Open a fresh chat and paste:
 
-```
+```text
 Continue dashboard work on PR claude/dashboard-data-wiring at
 /Users/ash/ITQAN/code/crm/.claude/worktrees/musing-mclean-4f7e1f.
 Read HANDOFF.md first, then `gh pr view` for the full diff narrative.

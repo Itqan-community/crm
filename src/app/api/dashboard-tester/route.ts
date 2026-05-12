@@ -33,7 +33,12 @@ function authorized(request: NextRequest): boolean {
   if (!secret) return process.env.NODE_ENV !== 'production';
   const url = new URL(request.url);
   const fromHeader = request.headers.get('authorization') === `Bearer ${secret}`;
-  const fromQuery = url.searchParams.get('token') === secret;
+  // ?token=… is the convenient browser-paste path for diagnosing in
+  // dev/preview. We disallow it in production so the secret can't leak
+  // via logs, browser history, or HTTP referers.
+  const fromQuery =
+    process.env.NODE_ENV !== 'production' &&
+    url.searchParams.get('token') === secret;
   return fromHeader || fromQuery;
 }
 
@@ -122,10 +127,16 @@ export async function GET(request: NextRequest) {
   );
 
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+  const { data, error: diagErr } = await supabase
     .from('dashboard_metric_daily')
     .select('metric_key, day, value, meta')
     .order('day', { ascending: false });
+  if (diagErr) {
+    return NextResponse.json(
+      { ok: false, error: `metric_daily query failed: ${diagErr.message}` },
+      { status: 500 },
+    );
+  }
   type Row = { metric_key: string; day: string; value: number; meta: Record<string, unknown> };
   const byMetric = new Map<string, Row[]>();
   for (const r of (data ?? []) as Row[]) {
@@ -162,11 +173,12 @@ async function captureToday(): Promise<{ written: number; day: string }> {
 
   if (bundle.forum) {
     const replies = (bundle.forum.newPosts ?? 0) + (bundle.forum.newDiscussions ?? 0);
+    const likes = bundle.forum.newLikes ?? 0;
     rows.push({
       day,
       metric_key: 'engagement',
-      value: replies,
-      meta: { replies, likes: 0, mentions: 0, shares: 0 },
+      value: replies + likes,
+      meta: { replies, likes, mentions: 0, shares: 0 },
     });
     rows.push({ day, metric_key: 'shares', value: bundle.forum.totalLikes ?? 0 });
   }

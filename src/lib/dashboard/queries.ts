@@ -20,10 +20,14 @@ export type SocialEditorRow = {
 
 export async function loadSocialEditorRows(): Promise<SocialEditorRow[]> {
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('dashboard_social_snapshots')
     .select('*')
     .order('snapshot_date', { ascending: false });
+  // Treat a failed query as a real error rather than "no rows" — an
+  // empty editor that an admin can save would silently overwrite valid
+  // data they meant to edit.
+  if (error) throw new Error(`loadSocialEditorRows failed: ${error.message}`);
   const byChannel = new Map<SocialChannelKey, SocialSnapshot>();
   for (const row of (data ?? []) as SocialSnapshot[]) {
     if (!byChannel.has(row.channel)) byChannel.set(row.channel, row);
@@ -56,6 +60,11 @@ export type WeekDayCell = {
   // signals to the UI that this value is pinned and won't be
   // overwritten by future cron/backfill runs.
   isManual: boolean;
+  // True when there's a row in dashboard_metric_daily for this
+  // (day, metric_key). False means no source has produced a value
+  // yet — UI renders the input empty (with a placeholder) so admins
+  // can distinguish "captured zero" from "no data captured".
+  hasRow: boolean;
 };
 
 export type EditableMetric = MetricDef & { rows: WeekDayCell[] };
@@ -172,11 +181,14 @@ export async function loadLastWeekForEdit(): Promise<EditableMetric[]> {
   }
 
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('dashboard_metric_daily')
     .select('day, metric_key, value, meta, is_manual')
     .gte('day', days[0].date)
     .lte('day', days[6].date);
+  // Don't render a zero-filled editor on query failure — the admin
+  // could click save and clobber real history.
+  if (error) throw new Error(`loadLastWeekForEdit failed: ${error.message}`);
 
   // Index by "day|metric_key" for O(1) lookups when filling cells.
   const byKey = new Map<
@@ -202,6 +214,7 @@ export async function loadLastWeekForEdit(): Promise<EditableMetric[]> {
         value: stored?.value ?? 0,
         meta: stored?.meta ?? {},
         isManual: stored?.isManual ?? false,
+        hasRow: !!stored,
       };
     }),
   }));

@@ -53,14 +53,16 @@ export async function GET(request: NextRequest) {
 
   if (bundle.forum) {
     const replies = (bundle.forum.newPosts ?? 0) + (bundle.forum.newDiscussions ?? 0);
+    const likes = bundle.forum.newLikes ?? 0;
     rows.push({
       day,
       metric_key: 'engagement',
-      value: replies,
+      value: replies + likes,
       // Breakdown we can populate from forum: replies+discussions
-      // count as "ردود ومناقشات". Likes/mentions/shares aren't
-      // tracked yet — leave them at 0 until a source surfaces them.
-      meta: { replies, likes: 0, mentions: 0, shares: 0 },
+      // count as "ردود ومناقشات", and post_likes counts as
+      // "إعجابات". Mentions/shares aren't tracked yet — leave them
+      // at 0 until a source surfaces them.
+      meta: { replies, likes, mentions: 0, shares: 0 },
     });
     rows.push({
       day,
@@ -136,11 +138,15 @@ export async function GET(request: NextRequest) {
 async function computeSocialReachForDay(day: string): Promise<number | null> {
   const { createSupabaseServerClient } = await import('@/lib/supabase/server');
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('dashboard_social_snapshots')
     .select('channel, snapshot_date, impressions, page_views, followers_total')
     .lte('snapshot_date', day)
     .order('snapshot_date', { ascending: false });
+  // Surface query errors instead of swallowing them as "no rows" — a DB
+  // problem here should make the cron run fail loud so we notice it
+  // instead of silently writing nothing.
+  if (error) throw new Error(`social_reach query failed: ${error.message}`);
   if (!data || data.length === 0) return null;
   const byChannel = new Map<string, number>();
   for (const row of data) {

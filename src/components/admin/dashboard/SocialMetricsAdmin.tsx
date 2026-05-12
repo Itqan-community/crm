@@ -105,17 +105,29 @@ function ChannelEditor({
 
   const onSave = () => {
     setError(null);
+    // Server already coerces via toIntOrNull, but normalizing here too
+    // means empty / non-numeric strings short-circuit before hitting
+    // the wire — fewer "saved" rows that silently dropped values.
+    const toNum = (raw?: string): number | null => {
+      const v = raw?.trim();
+      if (!v) return null;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : null;
+    };
     const payload = {
       channel,
       snapshot_date: date,
-      followers_total: values.followers_total ?? null,
-      followers_new: values.followers_new ?? null,
-      impressions: values.impressions ?? null,
-      page_views: values.page_views ?? null,
-      unique_visitors: values.unique_visitors ?? null,
-      engagements: values.engagements ?? null,
+      followers_total: toNum(values.followers_total),
+      followers_new: toNum(values.followers_new),
+      impressions: toNum(values.impressions),
+      page_views: toNum(values.page_views),
+      unique_visitors: toNum(values.unique_visitors),
+      engagements: toNum(values.engagements),
       extra: Object.fromEntries(
-        fields.filter((f) => f.in === 'extra').map((f) => [f.key, values[f.key] ?? '']),
+        fields
+          .filter((f) => f.in === 'extra')
+          .map((f) => [f.key, toNum(values[f.key])])
+          .filter(([, v]) => v !== null),
       ),
     };
     startTransition(async () => {

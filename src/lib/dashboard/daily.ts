@@ -98,12 +98,19 @@ export async function writeDailyRows(
     // upsert never touches them.
     const days = Array.from(new Set(rows.map((r) => r.day)));
     const keys = Array.from(new Set(rows.map((r) => r.metric_key)));
-    const { data: manualRows } = await supabase
+    // If this lookup fails we'd treat every row as non-manual and
+    // potentially overwrite pinned values — surface the error
+    // instead. There's a small TOCTOU window between this SELECT and
+    // the UPSERT below (a row becoming manual in between would still
+    // get overwritten); the proper fix is a DB-side RPC with
+    // `... WHERE is_manual = false` — tracked as a follow-up.
+    const { data: manualRows, error: manualErr } = await supabase
       .from('dashboard_metric_daily')
       .select('day, metric_key')
       .in('day', days)
       .in('metric_key', keys)
       .eq('is_manual', true);
+    if (manualErr) throw new Error(`preserveManual lookup failed: ${manualErr.message}`);
     const manualSet = new Set(
       (manualRows ?? []).map((r) => `${r.day}|${r.metric_key}`),
     );
@@ -142,11 +149,12 @@ export async function loadLatestSnapshots(windowDays: number): Promise<Map<Metri
   // Pull enough daily rows to cover this window AND the previous one
   // (for the delta comparison). +5 buffers against gaps.
   const rowsPerMetric = windowDays * 2 + 5;
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('dashboard_metric_daily')
     .select('day, metric_key, value, meta')
     .order('day', { ascending: false })
     .limit(rowsPerMetric * ALL_METRIC_KEYS.length);
+  if (error) throw new Error(`loadLatestSnapshots failed: ${error.message}`);
   const byMetric = new Map<MetricKey, Array<{ value: number; meta: Record<string, unknown> }>>();
   for (const row of data ?? []) {
     const key = row.metric_key as MetricKey;
@@ -224,11 +232,12 @@ export async function loadCalendarWeekSeries(): Promise<
   saturday.setDate(sunday.getDate() + 6);
 
   const toKey = (d: Date) => d.toISOString().slice(0, 10);
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('dashboard_metric_daily')
     .select('day, metric_key, value')
     .gte('day', toKey(prevSunday))
     .lte('day', toKey(saturday));
+  if (error) throw new Error(`loadCalendarWeekSeries failed: ${error.message}`);
 
   // index by metric → day → value
   const byMetricDay = new Map<MetricKey, Map<string, number>>();

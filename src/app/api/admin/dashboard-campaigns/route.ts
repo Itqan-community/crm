@@ -35,10 +35,24 @@ export async function GET(request: NextRequest) {
     // bracket encoding in the past.
     // MailerLite rejects `limit` below 10 — "The selected limit is
     // invalid". Use 10 (smallest accepted page) for the diagnostic.
-    const url =
-      new URL(request.url).searchParams.get('url') ??
+    // Hostname is allowlisted (connect.mailerlite.com) so an admin can't
+    // smuggle the Bearer token to an arbitrary URL (CodeQL SSRF).
+    const DEFAULT_URL =
       'https://connect.mailerlite.com/api/campaigns?filter%5Bstatus%5D=sent&limit=10';
-    const res = await fetch(url, {
+    const rawUrl = new URL(request.url).searchParams.get('url');
+    let target: URL;
+    try {
+      target = new URL(rawUrl ?? DEFAULT_URL);
+    } catch {
+      return NextResponse.json({ error: 'invalid_url' }, { status: 400 });
+    }
+    if (target.protocol !== 'https:' || target.hostname !== 'connect.mailerlite.com') {
+      return NextResponse.json(
+        { error: 'host_not_allowed', allowed: ['connect.mailerlite.com'] },
+        { status: 400 },
+      );
+    }
+    const res = await fetch(target.toString(), {
       headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
     });
     const text = await res.text();
@@ -49,7 +63,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       ok: res.ok,
       http_status: res.status,
-      url_used: url,
+      url_used: target.toString(),
       body_on_error: res.ok ? null : json,
       first_campaign_keys: first ? Object.keys(first) : [],
       first_campaign_stats: first?.stats ?? null,

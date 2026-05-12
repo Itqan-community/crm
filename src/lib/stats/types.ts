@@ -92,6 +92,7 @@ export type ForumMetrics = {
   newUsers: number;
   newDiscussions: number;
   newPosts: number;
+  newLikes: number;
   activeUsers: number;
   avgPostsPerDiscussion: number;
 };

@@ -28,15 +28,25 @@ export function HeroBand({
   const min = Math.min(...all) * 0.9;
   const max = Math.max(...all) * 1.08;
   const range = max - min || 1;
-  const step = (W - P * 2) / (heroSeries.length - 1);
-  const toPath = (vals: number[]) =>
-    vals
+  // A 1-point series would divide by zero — clamp the denominator so
+  // toPath returns either an empty path or a single M-point.
+  const canPlot = heroSeries.length > 1;
+  const step = canPlot ? (W - P * 2) / (heroSeries.length - 1) : 0;
+  const toPath = (vals: number[]) => {
+    if (vals.length === 0) return '';
+    if (vals.length === 1) {
+      const x = P;
+      const y = H - P - ((vals[0] - min) / range) * (H - P * 2);
+      return `M${x.toFixed(1)},${y.toFixed(1)}`;
+    }
+    return vals
       .map((v, i) => {
         const x = P + i * step;
         const y = H - P - ((v - min) / range) * (H - P * 2);
         return `${i === 0 ? 'M' : 'L'}${x.toFixed(1)},${y.toFixed(1)}`;
       })
       .join(' ');
+  };
 
   return (
     <div
@@ -99,7 +109,8 @@ export function HeroBand({
                 fontWeight: 500,
               }}
             >
-              ↑ {data.community.engagement.delta}% عن {PERIOD_AR[window]}
+              {data.community.engagement.delta >= 0 ? '↑' : '↓'}{' '}
+              {Math.abs(data.community.engagement.delta)}% عن {PERIOD_AR[window]}
             </span>
           </div>
           <div style={{ marginTop: 18, display: 'flex', gap: 18, fontSize: 11.5, opacity: 0.85, flexWrap: 'wrap' }}>

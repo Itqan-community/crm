@@ -68,7 +68,13 @@ export function PlatformSection({
             }}
           >
             {data.consumption.mix.map((m) => (
-              <div key={m.k} style={{ width: `${(m.v / total) * 100}%`, background: m.c }} />
+              <div
+                key={m.k}
+                style={{
+                  width: `${total > 0 ? (m.v / total) * 100 : 0}%`,
+                  background: m.c,
+                }}
+              />
             ))}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>

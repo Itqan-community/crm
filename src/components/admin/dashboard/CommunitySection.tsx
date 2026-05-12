@@ -41,7 +41,10 @@ export function CommunitySection({
               <div style={{ fontSize: 12, color: 'var(--muted)' }}>وصول النشرة</div>
               <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>معدل الفتح</div>
             </div>
-            <Delta value={3.3} suffix=" نقطة" />
+            <Delta
+              value={Math.round((data.newsletter.rate - data.newsletter.prevRate) * 10) / 10}
+              suffix=" نقطة"
+            />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 16 }}>
             <Ring pct={data.newsletter.rate} size={108} stroke={10} color="var(--gold)" />

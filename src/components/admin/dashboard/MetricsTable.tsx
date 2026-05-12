@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useState, useTransition } from 'react';
 import { saveWeeklyMetrics, type WeeklyMetricInput } from '@/lib/dashboard/actions';
 import type { EditableMetric } from '@/lib/dashboard/queries';
 
@@ -22,9 +22,14 @@ export function MetricsTable({ metrics }: { metrics: EditableMetric[] }) {
     const map: CellMap = {};
     for (const m of metrics) {
       for (const row of m.rows) {
-        map[cellKey(m.metricKey, row.day, 'value')] = String(row.value ?? 0);
+        // hasRow=false ⇒ no source ever produced a value for this
+        // (day,metric). Start the cell empty so the admin sees "no
+        // data" (placeholder) rather than a misleading "0".
+        map[cellKey(m.metricKey, row.day, 'value')] = row.hasRow ? String(row.value ?? 0) : '';
         for (const f of m.metaFields) {
-          map[cellKey(m.metricKey, row.day, f.key)] = String(row.meta[f.key] ?? 0);
+          map[cellKey(m.metricKey, row.day, f.key)] = row.hasRow
+            ? String(row.meta[f.key] ?? 0)
+            : '';
         }
       }
     }
@@ -36,6 +41,15 @@ export function MetricsTable({ metrics }: { metrics: EditableMetric[] }) {
   const [dirty, setDirty] = useState<Set<CellKey>>(new Set());
   const [pending, startTransition] = useTransition();
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
+
+  // After router.refresh() the parent re-renders with fresh `metrics`,
+  // which recomputes `initial`. Without this effect the local `values`
+  // state would keep stale numbers from before the refresh — saving
+  // again would clobber the server-side update.
+  useEffect(() => {
+    setValues(initial);
+    setDirty(new Set());
+  }, [initial]);
 
   const onChange = (mk: string, day: string, field: string, v: string) => {
     const k = cellKey(mk, day, field);
@@ -281,6 +295,7 @@ function Cell({
       dir="ltr"
       value={value}
       disabled={disabled}
+      placeholder="—"
       onChange={(e) => onChange(e.target.value)}
       className="num"
       style={{

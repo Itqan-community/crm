@@ -77,46 +77,65 @@ async function backfillForum(days: number): Promise<DailyRow[]> {
   });
 
   try {
-    // Engagement = posts + discussions per day. Flarum has a separate
-    // table for each. We aggregate in JS rather than UNION-ing in SQL
-    // so the query plan stays simple on either side.
+    // Engagement = posts + discussions + likes per day. Flarum tracks
+    // each in its own table; we aggregate in JS rather than UNION-ing
+    // in SQL so the query plan stays simple on either side.
     // mysql2's strict types insist on RowDataPacket — cast loosely
     // since we only consume two columns and don't need IDE hints.
     type Row = { day: string | Date; cnt: number | string };
-    const startDate = isoDaysAgo(days);
-    const [posts] = (await conn.query(
-      `SELECT DATE(created_at) AS day, COUNT(*) AS cnt
-       FROM posts
-       WHERE created_at >= ?
-       GROUP BY DATE(created_at)`,
-      [startDate],
-    )) as unknown as [Row[]];
-    const [discussions] = (await conn.query(
-      `SELECT DATE(created_at) AS day, COUNT(*) AS cnt
-       FROM discussions
-       WHERE created_at >= ?
-       GROUP BY DATE(created_at)`,
-      [startDate],
-    )) as unknown as [Row[]];
+    // Snap to 00:00:00 of the earliest emitted day so the SQL window
+    // matches the bucket loop exactly — using "N days ago" with the
+    // current time would silently drop activity from before that
+    // wall-clock minute on day N.
+    const startDate = `${isoDaysAgoExact(days - 1)} 00:00:00`;
+    const [posts, discussions, likes] = (await Promise.all([
+      conn.query(
+        `SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+         FROM posts
+         WHERE created_at >= ?
+         GROUP BY DATE(created_at)`,
+        [startDate],
+      ),
+      conn.query(
+        `SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+         FROM discussions
+         WHERE created_at >= ?
+         GROUP BY DATE(created_at)`,
+        [startDate],
+      ),
+      conn.query(
+        `SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+         FROM post_likes
+         WHERE created_at >= ?
+         GROUP BY DATE(created_at)`,
+        [startDate],
+      ),
+    ])) as unknown as [[Row[]], [Row[]], [Row[]]];
 
-    // Track posts and discussions separately so we can populate the
-    // breakdown meta — "ردود ومناقشات" combines both. Likes /
-    // mentions / shares aren't tracked yet, so they sit at 0.
-    const byDay = new Map<string, { value: number; replies: number }>();
-    const addToDay = (day: string, n: number) => {
-      const cur = byDay.get(day) ?? { value: 0, replies: 0 };
-      cur.value += n;
-      cur.replies += n;
-      byDay.set(day, cur);
+    // Track replies and likes separately so the meta breakdown matches
+    // the dashboard's UI labels. The total `value` rolls them all up.
+    // Mentions / shares aren't surfaced by core Flarum (mentions are
+    // an extension that may or may not be enabled; shares are not
+    // tracked), so they stay at 0 — leaving the rows in meta keeps
+    // existing rows additive-safe.
+    const byDay = new Map<string, { replies: number; likes: number }>();
+    const ensure = (day: string) => {
+      let cur = byDay.get(day);
+      if (!cur) {
+        cur = { replies: 0, likes: 0 };
+        byDay.set(day, cur);
+      }
+      return cur;
     };
-    for (const r of posts) addToDay(normalizeDay(r.day), Number(r.cnt));
-    for (const r of discussions) addToDay(normalizeDay(r.day), Number(r.cnt));
+    for (const r of posts[0]) ensure(normalizeDay(r.day)).replies += Number(r.cnt);
+    for (const r of discussions[0]) ensure(normalizeDay(r.day)).replies += Number(r.cnt);
+    for (const r of likes[0]) ensure(normalizeDay(r.day)).likes += Number(r.cnt);
 
     return Array.from(byDay, ([day, agg]) => ({
       day,
       metric_key: 'engagement' as const,
-      value: agg.value,
-      meta: { replies: agg.replies, likes: 0, mentions: 0, shares: 0 },
+      value: agg.replies + agg.likes,
+      meta: { replies: agg.replies, likes: agg.likes, mentions: 0, shares: 0 },
     }));
   } finally {
     await conn.end().catch(() => {});
@@ -208,10 +227,11 @@ async function backfillSocialReach(days: number): Promise<DailyRow[]> {
   // value. This produces a step function — the reach line flattens
   // between weekly entries and jumps when a new snapshot lands.
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('dashboard_social_snapshots')
     .select('channel, snapshot_date, impressions, page_views, followers_total')
     .order('snapshot_date', { ascending: true });
+  if (error) throw new Error(`social_reach query failed: ${error.message}`);
   if (!data || data.length === 0) return [];
 
   const out: DailyRow[] = [];
@@ -416,7 +436,10 @@ async function backfillShares(days: number): Promise<DailyRow[]> {
     // day — that's the cumulative "total community likes" we surface
     // as "مشاركات المجتمع".
     type Row = { day: string | Date; cnt: number | string };
-    const startDate = isoDaysAgo(days);
+    // Snap to 00:00:00 of the earliest emitted day so the per-day
+    // delta + baseline split lines up with the bucket boundaries —
+    // see the matching comment in backfillForum().
+    const startDate = `${isoDaysAgoExact(days - 1)} 00:00:00`;
     const [rows] = (await conn.query(
       `SELECT DATE(created_at) AS day, COUNT(*) AS cnt
        FROM post_likes
@@ -452,9 +475,6 @@ async function backfillShares(days: number): Promise<DailyRow[]> {
 
 // ---- Helpers ----------------------------------------------------------------
 
-function isoDaysAgo(n: number): string {
-  return new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 19).replace('T', ' ');
-}
 function isoDaysAgoExact(n: number): string {
   return new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
 }
