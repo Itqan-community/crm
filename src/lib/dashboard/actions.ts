@@ -124,3 +124,59 @@ function toNumOrNull(v: unknown): number | null {
   const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/,/g, ''));
   return Number.isFinite(n) ? n : null;
 }
+
+// ---- Cumulative snapshot (CMS metrics) ------------------------------------
+
+// CMS metrics (publishers, beneficiaries, consumption) are CUMULATIVE
+// running totals — the cron normally fills them via `stat_app_CMS_DB_URL`.
+// When that env var isn't set (or the connection is failing), the admin
+// needs a one-shot way to populate the cards without filling 7 cells
+// per metric in the MetricsTable. This action writes today's row for
+// any of the three keys you provide.
+//
+// `is_manual=true` is intentional: once the admin entered the truth,
+// the daily cron/backfill must not overwrite it. To switch a metric
+// back to live-sourced, the admin can re-enter the same value via the
+// MetricsTable (preserveManual=false will refresh it) or, in a future
+// pass, an explicit "unpin" toggle.
+export type CumulativeSnapshotInput = {
+  publishers?: number | string | null;
+  beneficiaries?: number | string | null;
+  consumption?: number | string | null;
+};
+
+const SNAPSHOTABLE_KEYS = ['publishers', 'beneficiaries', 'consumption'] as const;
+type SnapshotKey = (typeof SNAPSHOTABLE_KEYS)[number];
+
+function todayKey(): string {
+  // Same convention as `todayISO()` in daily.ts — YYYY-MM-DD in the
+  // server's local time, which is UTC on Vercel.
+  return new Date().toISOString().slice(0, 10);
+}
+
+export async function saveCumulativeSnapshot(
+  input: CumulativeSnapshotInput,
+): Promise<{ written: number; day: string }> {
+  await requireAdmin();
+  const day = todayKey();
+  const rows: DailyRow[] = [];
+  for (const key of SNAPSHOTABLE_KEYS) {
+    const raw = input[key as keyof CumulativeSnapshotInput];
+    const value = toNumOrNull(raw);
+    // Skip empty inputs so admins can update one metric at a time
+    // without clobbering the others.
+    if (value == null) continue;
+    rows.push({
+      day,
+      metric_key: key as SnapshotKey,
+      value,
+      meta: {},
+      is_manual: true,
+    });
+  }
+  if (rows.length === 0) return { written: 0, day };
+  const { written } = await writeDailyRows(rows, { preserveManual: false });
+  revalidatePath('/admin');
+  revalidatePath('/admin/settings/metrics');
+  return { written, day };
+}

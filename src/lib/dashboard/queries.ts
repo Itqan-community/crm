@@ -222,3 +222,57 @@ export async function loadLastWeekForEdit(): Promise<EditableMetric[]> {
     }),
   }));
 }
+
+// ---- Cumulative snapshot loader (CMS metrics) -----------------------------
+
+export type CumulativeSnapshotRow = {
+  metricKey: 'publishers' | 'beneficiaries' | 'consumption';
+  label: string;
+  description: string;
+  latestValue: number | null;
+  latestDay: string | null;
+  isManual: boolean;
+};
+
+const CUMULATIVE_KEYS = ['publishers', 'beneficiaries', 'consumption'] as const;
+
+// Latest stored row per CMS metric — feeds the CmsSnapshotForm so the
+// admin sees what's currently in `dashboard_metric_daily` and edits
+// from there instead of typing into an empty form every time.
+export async function loadCumulativeSnapshots(): Promise<CumulativeSnapshotRow[]> {
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from('dashboard_metric_daily')
+    .select('day, metric_key, value, is_manual')
+    .in('metric_key', CUMULATIVE_KEYS as unknown as string[])
+    .order('day', { ascending: false });
+  if (error) throw new Error(`loadCumulativeSnapshots failed: ${error.message}`);
+
+  // First row per key wins (we ordered DESC by day).
+  const latestByKey = new Map<
+    string,
+    { value: number; day: string; isManual: boolean }
+  >();
+  for (const row of data ?? []) {
+    const k = row.metric_key as string;
+    if (latestByKey.has(k)) continue;
+    latestByKey.set(k, {
+      value: Number(row.value),
+      day: row.day as string,
+      isManual: !!row.is_manual,
+    });
+  }
+
+  return CUMULATIVE_KEYS.map((k) => {
+    const def = METRIC_DEFINITIONS.find((d) => d.metricKey === k);
+    const stored = latestByKey.get(k);
+    return {
+      metricKey: k,
+      label: def?.label ?? k,
+      description: def?.description ?? '',
+      latestValue: stored?.value ?? null,
+      latestDay: stored?.day ?? null,
+      isManual: stored?.isManual ?? false,
+    };
+  });
+}

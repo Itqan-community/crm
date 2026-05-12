@@ -60,6 +60,12 @@ export async function EnvStatusBanner() {
     // banner is still useful on its own.
   }
 
+  // CRON_SECRET gates both the daily cron route and the diagnostic
+  // tester endpoint. Without it Vercel Cron auth fails and nothing
+  // gets captured automatically — surface it next to the source rows
+  // so the admin can verify all the operational env vars in one place.
+  const cronSecretSet = Boolean(process.env.CRON_SECRET);
+
   const rows = ALL_SOURCES.map((s) => {
     const keys = SOURCE_TO_METRIC_KEYS[s] ?? [];
     // Worst case wins: the source is "stale" if ANY of its metrics is
@@ -91,6 +97,24 @@ export async function EnvStatusBanner() {
     >
       <div className="text-[13px] font-semibold mb-2" style={{ color: 'var(--fg)' }}>
         صحّة المتغيّرات
+      </div>
+      <div
+        className="flex items-center justify-between gap-3 text-[12.5px] rounded-md px-2 py-1.5 mb-2"
+        style={{ color: cronSecretSet ? 'var(--fg)' : 'var(--muted)', background: 'rgba(0,0,0,0.02)' }}
+      >
+        <div className="flex items-center gap-2 min-w-0">
+          <span aria-hidden style={{ color: cronSecretSet ? '#16a34a' : '#d97706' }}>
+            {cronSecretSet ? '✓' : '⚠'}
+          </span>
+          <span className="truncate">
+            مفتاح الكرون (CRON_SECRET){cronSecretSet ? '' : ' — غير مضبوط'}
+          </span>
+        </div>
+        {!cronSecretSet && (
+          <code className="text-[11.5px] shrink-0" dir="ltr" style={{ color: 'var(--muted)' }}>
+            CRON_SECRET
+          </code>
+        )}
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
         {rows.map((r) => {

@@ -1,9 +1,13 @@
 import { requireAdminPage } from '@/lib/admin-guard';
 import { AdminOnlyNotice } from '@/components/admin/AdminOnlyNotice';
 import { SocialMetricsAdmin } from '@/components/admin/dashboard/SocialMetricsAdmin';
+import { CmsSnapshotForm } from '@/components/admin/dashboard/CmsSnapshotForm';
 import { BackfillButton } from '@/components/admin/dashboard/BackfillButton';
 import { RawCampaignsInspector } from '@/components/admin/dashboard/RawCampaignsInspector';
-import { loadSocialEditorRows } from '@/lib/dashboard/queries';
+import {
+  loadCumulativeSnapshots,
+  loadSocialEditorRows,
+} from '@/lib/dashboard/queries';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,7 +15,10 @@ export default async function MetricsSettingsPage() {
   const ctx = await requireAdminPage();
   if (!ctx.allowed) return <AdminOnlyNotice />;
 
-  const rows = await loadSocialEditorRows();
+  const [socialRows, cmsRows] = await Promise.all([
+    loadSocialEditorRows(),
+    loadCumulativeSnapshots(),
+  ]);
 
   return (
     <div className="max-w-4xl space-y-8">
@@ -24,7 +31,8 @@ export default async function MetricsSettingsPage() {
         </p>
       </div>
 
-      <SocialMetricsAdmin rows={rows} />
+      <SocialMetricsAdmin rows={socialRows} />
+      <CmsSnapshotForm rows={cmsRows} />
       <BackfillButton days={120} />
       <RawCampaignsInspector />
     </div>
