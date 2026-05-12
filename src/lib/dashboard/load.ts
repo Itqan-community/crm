@@ -30,6 +30,17 @@ import {
   SOCIAL_LABELS,
   WINDOW_DAYS,
 } from './types';
+import {
+  comparisonLabel,
+  dateKey,
+  defaultAnchor,
+  formatPeriodGregorian,
+  formatPeriodHijri,
+  fromDateKey,
+  periodRange,
+  previousPeriodRange,
+  type PeriodRange,
+} from './calendar';
 
 // Sunday-first labels, displayed in an RTL flex row so days[0]=أحد
 // lands on the right edge — matching the chart's data array which is
@@ -38,14 +49,28 @@ const DAY_LABELS_SUN_FIRST = ['أحد', 'إثن', 'ثلا', 'أرب', 'خمي', 
 
 // Top-level entry. Three Supabase queries in parallel — typically
 // <100ms once the daily table is populated.
-export async function loadDashboardData(window: DashboardWindow): Promise<DashboardData> {
+//
+// `anchorKey` is an optional YYYY-MM-DD that pins the period to a
+// specific day/week/month (driven by the date picker in the toolbar).
+// When absent we default to the LAST FULLY COMPLETED period before
+// today — i.e. for `window=week`, the previous Sun→Sat. That gives a
+// stable baseline; looking at an in-progress week is noisy and the
+// previous-week comparison would be against the in-progress one too.
+export async function loadDashboardData(
+  window: DashboardWindow,
+  anchorKey?: string,
+): Promise<DashboardData> {
   const windowDays = WINDOW_DAYS[window];
+  const anchor =
+    (anchorKey ? fromDateKey(anchorKey) : null) ?? defaultAnchor(window);
+  const current = periodRange(window, anchor);
+  const previous = previousPeriodRange(current);
   const [snapshots, socialByChannel, series] = await Promise.all([
     loadLatestSnapshots(windowDays),
     loadLatestSocialSnapshots(),
     loadCalendarWeekSeries(),
   ]);
-  return buildDashboard(snapshots, socialByChannel, series, window);
+  return buildDashboard(snapshots, socialByChannel, series, window, current, previous);
 }
 
 // Latest snapshot per channel.
@@ -70,6 +95,8 @@ function buildDashboard(
   social: Map<SocialChannelKey, SocialSnapshot>,
   series: Record<MetricKey, { now: number[]; prev: number[] }>,
   window: DashboardWindow,
+  current: PeriodRange,
+  previous: PeriodRange,
 ): DashboardData {
   // Pull every metric we might use, defaulting to a zero snapshot so
   // the UI never crashes on a missing key.
@@ -87,7 +114,7 @@ function buildDashboard(
   const shares = get('shares');
 
   return {
-    range: rangeLabel(window),
+    range: rangeLabel(window, current, previous),
     community: {
       newsletter: {
         value: newsletter.value,
@@ -175,20 +202,27 @@ function buildSocialReach(
   return { value, delta: 0, channels };
 }
 
-function rangeLabel(window: DashboardWindow): DashboardData['range'] {
-  const today = new Date();
-  const start = new Date(today.getTime() - (WINDOW_DAYS[window] - 1) * 86_400_000);
-  const fmt = (d: Date) =>
-    d.toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' });
-  const compare =
-    window === 'day'
-      ? 'مقارنة باليوم السابق'
-      : window === 'week'
-        ? 'مقارنة بالأسبوع السابق'
-        : 'مقارنة بالشهر السابق';
+function rangeLabel(
+  window: DashboardWindow,
+  current: PeriodRange,
+  previous: PeriodRange,
+): DashboardData['range'] {
+  const hijri = formatPeriodHijri(current);
+  const gregorian = formatPeriodGregorian(current);
+  const compareHijri = formatPeriodHijri(previous);
+  const compareGregorian = formatPeriodGregorian(previous);
+  const cmpLabel = comparisonLabel(window);
   return {
-    label: `${fmt(start)} – ${fmt(today)} ${today.getFullYear()}`,
-    compare,
+    // Hijri-primary headline. Caller renders Gregorian as a small
+    // secondary line — see Toolbar.tsx.
+    label: hijri,
+    compare: `مقارنة بـ ${compareHijri}`,
+    hijriLabel: hijri,
+    gregorianLabel: gregorian,
+    compareHijriLabel: compareHijri,
+    compareGregorianLabel: compareGregorian,
+    comparisonLabel: cmpLabel,
+    anchorKey: dateKey(current.start),
   };
 }
 

@@ -9,11 +9,12 @@ export const dynamic = 'force-dynamic';
 export default async function AdminDashboardHome({
   searchParams,
 }: {
-  searchParams: Promise<{ window?: string }>;
+  searchParams: Promise<{ window?: string; date?: string }>;
 }) {
   const sp = await searchParams;
   const window: DashboardWindow =
     sp.window === 'day' || sp.window === 'month' ? sp.window : 'week';
+  const anchorKey = typeof sp.date === 'string' ? sp.date : undefined;
 
   // The layout already verified the user is in team_members. Cheap
   // role re-fetch here gates whether we ship the editable table at
@@ -27,7 +28,7 @@ export default async function AdminDashboardHome({
   const isAdmin = tm?.role === 'admin';
 
   const [data, editable] = await Promise.all([
-    loadDashboardData(window),
+    loadDashboardData(window, anchorKey),
     isAdmin ? loadLastWeekForEdit() : Promise.resolve(null),
   ]);
 

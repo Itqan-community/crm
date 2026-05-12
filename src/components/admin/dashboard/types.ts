@@ -1,7 +1,20 @@
 export type SeriesPair = { now: number[]; prev: number[] };
 
 export type DashboardData = {
-  range: { label: string; compare: string };
+  range: {
+    // `label` and `compare` are the legacy headline strings — kept so
+    // any older consumer keeps compiling. The new fields let the
+    // toolbar render Hijri-primary + Gregorian-secondary, and drive a
+    // date picker via `anchorKey`.
+    label: string;
+    compare: string;
+    hijriLabel: string;
+    gregorianLabel: string;
+    compareHijriLabel: string;
+    compareGregorianLabel: string;
+    comparisonLabel: string;
+    anchorKey: string; // YYYY-MM-DD KSA — canonical for URL `?date=`
+  };
   community: {
     newsletter: {
       value: number;

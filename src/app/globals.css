@@ -275,6 +275,37 @@ button:active:not(:disabled) {
   border-color: var(--accent);
 }
 .dash-btn-primary:hover { filter: brightness(1.08); }
+.dash-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Prev/next navigators around the date input */
+.dash-icon-btn {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  font-size: 18px;
+  font-weight: 500;
+  justify-content: center;
+  line-height: 1;
+}
+.dash-date-input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--rule);
+  background: rgba(255,255,255,0.6);
+  color: var(--fg);
+  font-family: inherit;
+  font-size: 13px;
+  font-feature-settings: "tnum" 1;
+  cursor: pointer;
+  min-width: 140px;
+  text-align: center;
+}
+.dash-date-input:hover { background: rgba(255,255,255,0.9); }
+.dash-date-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dash-date-input::-webkit-calendar-picker-indicator { cursor: pointer; opacity: 0.6; }
+.dash-date-input::-webkit-calendar-picker-indicator:hover { opacity: 1; }
 
 /* Responsive grids — design is desktop-first (1400×1080) but the cards
    stack on tablets/phones so the dashboard stays usable on smaller

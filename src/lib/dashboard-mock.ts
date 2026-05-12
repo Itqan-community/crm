@@ -5,7 +5,16 @@ import type { DashboardData } from '@/components/admin/dashboard/types';
 // swap with live queries (MailerLite / Itqan stats / Supabase) later.
 // Week range: 27 Apr – 3 May 2026 vs 20 – 26 Apr 2026.
 export const DASHBOARD_DATA: DashboardData = {
-  range: { label: '27 أبريل – 3 مايو 2026', compare: 'مقارنة بـ 20 – 26 أبريل' },
+  range: {
+    label: '٢٧ شوال – ٤ ذو القعدة ١٤٤٧ هـ',
+    compare: 'مقارنة بـ ٢٠ – ٢٦ شوال ١٤٤٧ هـ',
+    hijriLabel: '٢٧ شوال – ٤ ذو القعدة ١٤٤٧ هـ',
+    gregorianLabel: '٢٧ أبريل – ٣ مايو ٢٠٢٦',
+    compareHijriLabel: '٢٠ – ٢٦ شوال ١٤٤٧ هـ',
+    compareGregorianLabel: '٢٠ – ٢٦ أبريل ٢٠٢٦',
+    comparisonLabel: 'الأسبوع السابق',
+    anchorKey: '2026-04-27',
+  },
 
   community: {
     newsletter: {
