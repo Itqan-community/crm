@@ -114,7 +114,7 @@ export function HeroBand({
             </span>
           </div>
           <div style={{ marginTop: 18, display: 'flex', gap: 18, fontSize: 11.5, opacity: 0.85, flexWrap: 'wrap' }}>
-            {data.community.engagement.breakdown.slice(0, 4).map((b) => (
+            {data.community.engagement.breakdown.slice(0, 5).map((b) => (
               <div key={b.k}>
                 <div style={{ opacity: 0.7 }}>{b.k}</div>
                 <div className="num" style={{ fontSize: 16, fontWeight: 500, opacity: 1 }}>

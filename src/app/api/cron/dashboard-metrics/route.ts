@@ -52,17 +52,23 @@ export async function GET(request: NextRequest) {
   const rows: DailyRow[] = [];
 
   if (bundle.forum) {
-    const replies = (bundle.forum.newPosts ?? 0) + (bundle.forum.newDiscussions ?? 0);
+    // Five separate signals (see backfillForum for the rationale):
+    //   discussions  = new threads
+    //   replies      = real replies (posts − discussions)
+    //   likes        = post_likes count
+    //   new_users    = signups
+    //   active_users = DAU
+    // value rolls up only event counts so weekly sums stay meaningful.
+    const discussions = bundle.forum.newDiscussions ?? 0;
+    const replies = bundle.forum.newReplies ?? 0;
     const likes = bundle.forum.newLikes ?? 0;
+    const new_users = bundle.forum.newUsers ?? 0;
+    const active_users = bundle.forum.activeUsers ?? 0;
     rows.push({
       day,
       metric_key: 'engagement',
-      value: replies + likes,
-      // Breakdown we can populate from forum: replies+discussions
-      // count as "ردود ومناقشات", and post_likes counts as
-      // "إعجابات". Mentions/shares aren't tracked yet — leave them
-      // at 0 until a source surfaces them.
-      meta: { replies, likes, mentions: 0, shares: 0 },
+      value: discussions + replies + likes,
+      meta: { discussions, replies, likes, new_users, active_users },
     });
     rows.push({
       day,

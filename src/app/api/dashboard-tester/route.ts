@@ -172,13 +172,16 @@ async function captureToday(): Promise<{ written: number; day: string }> {
   const rows: DailyRow[] = [];
 
   if (bundle.forum) {
-    const replies = (bundle.forum.newPosts ?? 0) + (bundle.forum.newDiscussions ?? 0);
+    const discussions = bundle.forum.newDiscussions ?? 0;
+    const replies = bundle.forum.newReplies ?? 0;
     const likes = bundle.forum.newLikes ?? 0;
+    const new_users = bundle.forum.newUsers ?? 0;
+    const active_users = bundle.forum.activeUsers ?? 0;
     rows.push({
       day,
       metric_key: 'engagement',
-      value: replies + likes,
-      meta: { replies, likes, mentions: 0, shares: 0 },
+      value: discussions + replies + likes,
+      meta: { discussions, replies, likes, new_users, active_users },
     });
     rows.push({ day, metric_key: 'shares', value: bundle.forum.totalLikes ?? 0 });
   }

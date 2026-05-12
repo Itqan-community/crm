@@ -77,18 +77,38 @@ async function backfillForum(days: number): Promise<DailyRow[]> {
   });
 
   try {
-    // Engagement = posts + discussions + likes per day. Flarum tracks
-    // each in its own table; we aggregate in JS rather than UNION-ing
-    // in SQL so the query plan stays simple on either side.
-    // mysql2's strict types insist on RowDataPacket — cast loosely
-    // since we only consume two columns and don't need IDE hints.
+    // Engagement breakdown — five per-day counts from Flarum:
+    //   discussions     ← discussions.created_at        (new threads)
+    //   replies         ← posts.created_at − discussions (real replies)
+    //   likes           ← post_likes.created_at         (if extension installed)
+    //   new_users       ← users.joined_at               (signups)
+    //   active_users    ← users.last_seen_at            (DAU)
+    //
+    // Note: SUM(active_users) across a multi-day window is total
+    // user-days, not distinct WAU/MAU — Flarum's `last_seen_at` is a
+    // single timestamp per user, so we can't reconstruct distinct
+    // weekly-actives from daily snapshots. The headline `value` rolls
+    // up only event counts (discussions + replies + likes) so the
+    // hero number stays meaningful when aggregated.
     type Row = { day: string | Date; cnt: number | string };
     // Snap to 00:00:00 of the earliest emitted day so the SQL window
-    // matches the bucket loop exactly — using "N days ago" with the
-    // current time would silently drop activity from before that
-    // wall-clock minute on day N.
+    // matches the bucket loop exactly.
     const startDate = `${isoDaysAgoExact(days - 1)} 00:00:00`;
-    const [posts, discussions, likes] = (await Promise.all([
+
+    // post_likes may not exist on every Flarum install (the Likes
+    // extension is optional). Swallow the query error and treat each
+    // day's likes as 0 — the rest of the breakdown still lands.
+    const safeLikes = conn
+      .query(
+        `SELECT DATE(created_at) AS day, COUNT(*) AS cnt
+         FROM post_likes
+         WHERE created_at >= ?
+         GROUP BY DATE(created_at)`,
+        [startDate],
+      )
+      .catch(() => [[]] as [Row[]]);
+
+    const [posts, discussions, likes, joined, active] = (await Promise.all([
       conn.query(
         `SELECT DATE(created_at) AS day, COUNT(*) AS cnt
          FROM posts
@@ -103,39 +123,71 @@ async function backfillForum(days: number): Promise<DailyRow[]> {
          GROUP BY DATE(created_at)`,
         [startDate],
       ),
+      safeLikes,
       conn.query(
-        `SELECT DATE(created_at) AS day, COUNT(*) AS cnt
-         FROM post_likes
-         WHERE created_at >= ?
-         GROUP BY DATE(created_at)`,
+        `SELECT DATE(joined_at) AS day, COUNT(*) AS cnt
+         FROM users
+         WHERE joined_at >= ?
+         GROUP BY DATE(joined_at)`,
         [startDate],
       ),
-    ])) as unknown as [[Row[]], [Row[]], [Row[]]];
+      conn.query(
+        `SELECT DATE(last_seen_at) AS day, COUNT(DISTINCT id) AS cnt
+         FROM users
+         WHERE last_seen_at >= ?
+         GROUP BY DATE(last_seen_at)`,
+        [startDate],
+      ),
+    ])) as unknown as [[Row[]], [Row[]], [Row[]], [Row[]], [Row[]]];
 
-    // Track replies and likes separately so the meta breakdown matches
-    // the dashboard's UI labels. The total `value` rolls them all up.
-    // Mentions / shares aren't surfaced by core Flarum (mentions are
-    // an extension that may or may not be enabled; shares are not
-    // tracked), so they stay at 0 — leaving the rows in meta keeps
-    // existing rows additive-safe.
-    const byDay = new Map<string, { replies: number; likes: number }>();
-    const ensure = (day: string) => {
+    type DayAgg = {
+      discussions: number;
+      replies: number; // posts − discussions for that same day
+      likes: number;
+      new_users: number;
+      active_users: number;
+      _rawPosts: number;
+    };
+    const byDay = new Map<string, DayAgg>();
+    const ensure = (day: string): DayAgg => {
       let cur = byDay.get(day);
       if (!cur) {
-        cur = { replies: 0, likes: 0 };
+        cur = {
+          discussions: 0,
+          replies: 0,
+          likes: 0,
+          new_users: 0,
+          active_users: 0,
+          _rawPosts: 0,
+        };
         byDay.set(day, cur);
       }
       return cur;
     };
-    for (const r of posts[0]) ensure(normalizeDay(r.day)).replies += Number(r.cnt);
-    for (const r of discussions[0]) ensure(normalizeDay(r.day)).replies += Number(r.cnt);
+    for (const r of posts[0]) ensure(normalizeDay(r.day))._rawPosts += Number(r.cnt);
+    for (const r of discussions[0]) ensure(normalizeDay(r.day)).discussions += Number(r.cnt);
     for (const r of likes[0]) ensure(normalizeDay(r.day)).likes += Number(r.cnt);
+    for (const r of joined[0]) ensure(normalizeDay(r.day)).new_users += Number(r.cnt);
+    for (const r of active[0]) ensure(normalizeDay(r.day)).active_users += Number(r.cnt);
+
+    // Replies = total posts on day − first-posts (one per new
+    // discussion). Clamp at 0 against any tz drift between the two
+    // tables.
+    for (const agg of byDay.values()) {
+      agg.replies = Math.max(0, agg._rawPosts - agg.discussions);
+    }
 
     return Array.from(byDay, ([day, agg]) => ({
       day,
       metric_key: 'engagement' as const,
-      value: agg.replies + agg.likes,
-      meta: { replies: agg.replies, likes: agg.likes, mentions: 0, shares: 0 },
+      value: agg.discussions + agg.replies + agg.likes,
+      meta: {
+        discussions: agg.discussions,
+        replies: agg.replies,
+        likes: agg.likes,
+        new_users: agg.new_users,
+        active_users: agg.active_users,
+      },
     }));
   } finally {
     await conn.end().catch(() => {});

@@ -100,11 +100,17 @@ function buildDashboard(
       engagement: {
         value: engagement.value,
         delta: engagement.delta,
+        // Order matches the editor on /admin: events first
+        // (مواضيع / ردود / إعجابات), then user state
+        // (فاعلون / جدد). active_users summed over a multi-day
+        // window is user-days, not distinct WAU — see the comment
+        // in backfillForum() for why we accept that.
         breakdown: [
-          { k: 'ردود ومناقشات', v: numFromMeta(engagement.meta, 'replies'),  c: 'var(--accent)' },
-          { k: 'إعجابات',       v: numFromMeta(engagement.meta, 'likes'),    c: 'var(--gold)' },
-          { k: 'إشارات وذكر',   v: numFromMeta(engagement.meta, 'mentions'), c: 'var(--info)' },
-          { k: 'مشاركات',       v: numFromMeta(engagement.meta, 'shares'),   c: 'var(--warn)' },
+          { k: 'مواضيع جديدة',     v: numFromMeta(engagement.meta, 'discussions'),  c: 'var(--accent)' },
+          { k: 'ردود',             v: numFromMeta(engagement.meta, 'replies'),      c: 'var(--gold)' },
+          { k: 'إعجابات',          v: numFromMeta(engagement.meta, 'likes'),        c: 'var(--info)' },
+          { k: 'مستخدمون فاعلون',  v: numFromMeta(engagement.meta, 'active_users'), c: 'var(--warn)' },
+          { k: 'مستخدمون جدد',     v: numFromMeta(engagement.meta, 'new_users'),    c: 'var(--accent-soft)' },
         ],
       },
       socialReach: buildSocialReach(social),

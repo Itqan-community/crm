@@ -90,6 +90,7 @@ export async function getForum(opts: {
       newUsers,
       newDiscussions,
       newPosts,
+      newReplies: Math.max(0, newPosts - newDiscussions),
       newLikes,
       activeUsers,
       avgPostsPerDiscussion:

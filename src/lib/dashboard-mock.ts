@@ -20,10 +20,11 @@ export const DASHBOARD_DATA: DashboardData = {
       value: 3214,
       delta: 12.6,
       breakdown: [
-        { k: 'ردود ومناقشات', v: 1284, c: 'var(--accent)' },
-        { k: 'إعجابات', v: 982, c: 'var(--gold)' },
-        { k: 'إشارات وذكر', v: 524, c: 'var(--info)' },
-        { k: 'مشاركات', v: 424, c: 'var(--warn)' },
+        { k: 'مواضيع جديدة',    v: 184,  c: 'var(--accent)' },
+        { k: 'ردود',            v: 1284, c: 'var(--gold)' },
+        { k: 'إعجابات',         v: 982,  c: 'var(--info)' },
+        { k: 'مستخدمون فاعلون', v: 524,  c: 'var(--warn)' },
+        { k: 'مستخدمون جدد',    v: 42,   c: 'var(--accent-soft)' },
       ],
     },
     socialReach: {

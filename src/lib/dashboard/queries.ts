@@ -77,13 +77,16 @@ export const METRIC_DEFINITIONS: MetricDef[] = [
   {
     metricKey: 'engagement',
     label: 'تفاعل المجتمع',
-    description: 'مجموع التفاعلات اليومية في المنتدى (ردود + مناقشات + إعجابات + إشارات + مشاركات).',
+    description:
+      'الأحداث اليومية في المنتدى. القيمة الأساسية = مواضيع + ردود + إعجابات. ' +
+      'المستخدمون الفاعلون والجدد يُعرضان للمتابعة (لا يُجمعان في الإجمالي).',
     valueLabel: 'المجموع',
     metaFields: [
-      { key: 'replies',  label: 'ردود ومناقشات' },
-      { key: 'likes',    label: 'إعجابات' },
-      { key: 'mentions', label: 'إشارات وذكر' },
-      { key: 'shares',   label: 'مشاركات' },
+      { key: 'discussions',  label: 'مواضيع جديدة' },
+      { key: 'replies',      label: 'ردود' },
+      { key: 'likes',        label: 'إعجابات' },
+      { key: 'active_users', label: 'مستخدمون فاعلون' },
+      { key: 'new_users',    label: 'مستخدمون جدد' },
     ],
   },
   {
