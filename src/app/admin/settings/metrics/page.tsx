@@ -25,7 +25,7 @@ export default async function MetricsSettingsPage() {
       </div>
 
       <SocialMetricsAdmin rows={rows} />
-      <BackfillButton days={30} />
+      <BackfillButton days={120} />
       <RawCampaignsInspector />
     </div>
   );

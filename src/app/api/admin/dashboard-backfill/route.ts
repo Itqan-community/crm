@@ -9,8 +9,9 @@ import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
 // Backfill walks several source DBs; give it enough headroom on Pro.
-// Hobby plans cap at 60s — that's usually fine for 30 days, but
-// reduce `days` if it times out.
+// Hobby plans cap at 60s and would time out on a 120-day run — keep
+// the project on Pro, or pass a smaller `?days=N` for the rare manual
+// retry.
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {

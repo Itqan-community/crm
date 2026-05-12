@@ -6,7 +6,7 @@ import { useState, useTransition } from 'react';
 // One-click trigger for /api/admin/dashboard-backfill. That endpoint
 // authenticates via the Supabase session cookie (admin role) — no
 // Bearer token needed since this page already gates on requireAdmin.
-export function BackfillButton({ days = 30 }: { days?: number }) {
+export function BackfillButton({ days = 120 }: { days?: number }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [result, setResult] = useState<string | null>(null);
