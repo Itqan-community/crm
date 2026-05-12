@@ -105,10 +105,16 @@ export async function saveWeeklyMetrics(input: WeeklyMetricInput[]) {
       metric_key: row.metric_key,
       value: toNumOrNull(row.value) ?? 0,
       meta,
+      // Admin-entered values are pinned: the cron/backfill won't
+      // overwrite them on subsequent runs.
+      is_manual: true,
     };
   });
 
-  const result = await writeDailyRows(rows);
+  // preserveManual=false because THIS is the manual edit path. We
+  // intentionally overwrite whatever's there (incl. prior manual
+  // entries) with what the admin just typed.
+  const result = await writeDailyRows(rows, { preserveManual: false });
   revalidatePath('/admin');
   return result;
 }

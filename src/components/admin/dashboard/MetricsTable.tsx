@@ -105,9 +105,12 @@ export function MetricsTable({ metrics }: { metrics: EditableMetric[] }) {
         <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, fontFamily: 'var(--font-display)' }}>
           مراجعة وتعديل أرقام الأسبوع الماضي
         </h2>
-        <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--muted)' }}>
+        <p style={{ margin: '4px 0 0', fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.7 }}>
           كل صف يمثل قيمة يوم في الأسبوع الماضي (الأحد إلى السبت). عدّل أي خانة واضغط حفظ —
-          الرسوم البيانية فوق ستحدّث تلقائياً (الخط المتقطّع في الرسم يمثّل هذه الأرقام).
+          الرسوم البيانية فوق ستحدّث تلقائياً.
+          <br />
+          القيم التي تُدخلها يدوياً <strong>تُثبَّت</strong> (يظهر بجانبها 📌)
+          ولن يُكتب فوقها من الكرون الليلي أو زر إعادة الملء. لتراجعها لاحقاً عدّل الخانة وحفظ.
         </p>
       </header>
 
@@ -186,9 +189,17 @@ function MetricCard({
             <div
               key={`hdr-${r.day}`}
               style={{ fontSize: 11, color: 'var(--muted)', textAlign: 'center' }}
-              title={r.day}
+              title={r.isManual ? `${r.day} — مُثبَّت يدوياً` : r.day}
             >
               {r.weekdayLabel}
+              {r.isManual && (
+                <span
+                  aria-label="مُثبَّت يدوياً"
+                  style={{ marginInlineStart: 4, fontSize: 10 }}
+                >
+                  📌
+                </span>
+              )}
             </div>
           ))}
 

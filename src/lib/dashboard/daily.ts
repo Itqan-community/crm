@@ -62,6 +62,9 @@ export type DailyRow = {
   metric_key: MetricKey;
   value: number;
   meta?: Record<string, unknown>;
+  // When true, the row is a manual override from the admin metrics
+  // table. Cron + backfill must NOT overwrite it.
+  is_manual?: boolean;
 };
 
 export type LatestSnapshot = {
@@ -72,19 +75,57 @@ export type LatestSnapshot = {
 };
 
 
-// Upsert today's (or any given day's) values. Used by the daily cron
-// and by the backfill function.
-export async function writeDailyRows(rows: DailyRow[]): Promise<{ written: number }> {
-  if (rows.length === 0) return { written: 0 };
+// Upsert one or more (day, metric_key) rows.
+//
+// preserveManual = true (default) skips any existing row already
+// flagged is_manual — used by the daily cron and the backfill so
+// admin-entered values survive. preserveManual = false unconditionally
+// overwrites, which is what the saveWeeklyMetrics action needs when
+// the admin is editing a row through the UI.
+export async function writeDailyRows(
+  rows: DailyRow[],
+  options: { preserveManual?: boolean } = {},
+): Promise<{ written: number; skippedManual: number }> {
+  if (rows.length === 0) return { written: 0, skippedManual: 0 };
   const supabase = await createSupabaseServerClient();
-  // Normalize each row so meta always lands as an object (not undefined)
-  // — keeps the DB default behaviour predictable.
-  const normalized = rows.map((r) => ({ ...r, meta: r.meta ?? {} }));
+  const preserveManual = options.preserveManual ?? true;
+
+  let rowsToWrite = rows;
+  let skippedManual = 0;
+  if (preserveManual) {
+    // Query the manual-flagged set in the (day, metric_key) range
+    // we're about to upsert; drop those rows from our batch so the
+    // upsert never touches them.
+    const days = Array.from(new Set(rows.map((r) => r.day)));
+    const keys = Array.from(new Set(rows.map((r) => r.metric_key)));
+    const { data: manualRows } = await supabase
+      .from('dashboard_metric_daily')
+      .select('day, metric_key')
+      .in('day', days)
+      .in('metric_key', keys)
+      .eq('is_manual', true);
+    const manualSet = new Set(
+      (manualRows ?? []).map((r) => `${r.day}|${r.metric_key}`),
+    );
+    if (manualSet.size > 0) {
+      rowsToWrite = rows.filter(
+        (r) => !manualSet.has(`${r.day}|${r.metric_key}`),
+      );
+      skippedManual = rows.length - rowsToWrite.length;
+    }
+  }
+
+  if (rowsToWrite.length === 0) return { written: 0, skippedManual };
+  const normalized = rowsToWrite.map((r) => ({
+    ...r,
+    meta: r.meta ?? {},
+    is_manual: r.is_manual ?? false,
+  }));
   const { error } = await supabase
     .from('dashboard_metric_daily')
     .upsert(normalized, { onConflict: 'day,metric_key' });
   if (error) throw new Error(error.message);
-  return { written: rows.length };
+  return { written: rowsToWrite.length, skippedManual };
 }
 
 // Window-aware aggregation. For each metric the value/delta semantics

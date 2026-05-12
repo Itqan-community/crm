@@ -52,6 +52,10 @@ export type WeekDayCell = {
   isFuture: boolean;
   value: number;
   meta: Record<string, number>;
+  // True when the row was last written by the manual-edit path —
+  // signals to the UI that this value is pinned and won't be
+  // overwritten by future cron/backfill runs.
+  isManual: boolean;
 };
 
 export type EditableMetric = MetricDef & { rows: WeekDayCell[] };
@@ -170,16 +174,20 @@ export async function loadLastWeekForEdit(): Promise<EditableMetric[]> {
   const supabase = await createSupabaseServerClient();
   const { data } = await supabase
     .from('dashboard_metric_daily')
-    .select('day, metric_key, value, meta')
+    .select('day, metric_key, value, meta, is_manual')
     .gte('day', days[0].date)
     .lte('day', days[6].date);
 
   // Index by "day|metric_key" for O(1) lookups when filling cells.
-  const byKey = new Map<string, { value: number; meta: Record<string, number> }>();
+  const byKey = new Map<
+    string,
+    { value: number; meta: Record<string, number>; isManual: boolean }
+  >();
   for (const row of data ?? []) {
     byKey.set(`${row.day}|${row.metric_key}`, {
       value: Number(row.value),
       meta: (row.meta as Record<string, number>) ?? {},
+      isManual: !!row.is_manual,
     });
   }
 
@@ -193,6 +201,7 @@ export async function loadLastWeekForEdit(): Promise<EditableMetric[]> {
         isFuture: d.isFuture,
         value: stored?.value ?? 0,
         meta: stored?.meta ?? {},
+        isManual: stored?.isManual ?? false,
       };
     }),
   }));
