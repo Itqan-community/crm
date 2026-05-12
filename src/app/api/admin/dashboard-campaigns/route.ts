@@ -25,33 +25,27 @@ export async function GET(request: NextRequest) {
 
   // ?raw=1 mode: hit MailerLite directly and dump the unparsed JSON.
   // Lets us see exactly what fields the API returns — or if it errors,
-  // what the error message says.
+  // what the error message says. The URL is constructed entirely
+  // server-side from a fixed origin and a `limit` query param the user
+  // can tune, so no taint flows from request.url into fetch() — CodeQL
+  // confirms there's no SSRF path here.
   if (new URL(request.url).searchParams.get('raw') === '1') {
     const apiKey = process.env.mailerlite_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ configured: false, hint: 'mailerlite_API_KEY missing' });
     }
-    // Try a few URL encodings — MailerLite has been strict about
-    // bracket encoding in the past.
-    // MailerLite rejects `limit` below 10 — "The selected limit is
-    // invalid". Use 10 (smallest accepted page) for the diagnostic.
-    // Hostname is allowlisted (connect.mailerlite.com) so an admin can't
-    // smuggle the Bearer token to an arbitrary URL (CodeQL SSRF).
-    const DEFAULT_URL =
-      'https://connect.mailerlite.com/api/campaigns?filter%5Bstatus%5D=sent&limit=10';
-    const rawUrl = new URL(request.url).searchParams.get('url');
-    let target: URL;
-    try {
-      target = new URL(rawUrl ?? DEFAULT_URL);
-    } catch {
-      return NextResponse.json({ error: 'invalid_url' }, { status: 400 });
-    }
-    if (target.protocol !== 'https:' || target.hostname !== 'connect.mailerlite.com') {
-      return NextResponse.json(
-        { error: 'host_not_allowed', allowed: ['connect.mailerlite.com'] },
-        { status: 400 },
-      );
-    }
+    // MailerLite rejects `limit` below 10 ("The selected limit is
+    // invalid"). Clamp to a sane range so the diagnostic stays cheap.
+    const limitRaw = parseInt(
+      new URL(request.url).searchParams.get('limit') ?? '10',
+      10,
+    );
+    const limit = Number.isFinite(limitRaw)
+      ? Math.max(10, Math.min(100, limitRaw))
+      : 10;
+    const target = new URL('https://connect.mailerlite.com/api/campaigns');
+    target.searchParams.set('filter[status]', 'sent');
+    target.searchParams.set('limit', String(limit));
     const res = await fetch(target.toString(), {
       headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
     });
