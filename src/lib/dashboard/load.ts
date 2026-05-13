@@ -28,7 +28,6 @@ import {
   type SocialChannelKey,
   DISPLAYED_CHANNELS,
   SOCIAL_LABELS,
-  WINDOW_DAYS,
 } from './types';
 import {
   comparisonLabel,

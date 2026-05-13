@@ -3,51 +3,38 @@
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useCallback, useMemo, useTransition } from 'react';
 import type { DashboardWindow } from '@/lib/dashboard/types';
+import {
+  addDays,
+  addMonths,
+  addWeeks,
+  dateKey,
+  fromDateKey,
+  startOfKsaWeek,
+} from '@/lib/dashboard/calendar';
 import type { DashboardData } from './types';
 
-// All wall-clock math runs in KSA (Asia/Riyadh, no DST → fixed +03).
-// Picker control uses native <input type="date"|"month"> which speaks
-// the browser's local time; we explicitly convert through YYYY-MM-DD
-// so a user in another timezone can't accidentally drift our anchor.
-const KSA_OFFSET_HOURS = 3;
-const MS_PER_DAY = 24 * 3_600_000;
+// All wall-clock math runs in KSA (Asia/Riyadh, no DST → fixed +03)
+// via the helpers in lib/dashboard/calendar.ts. Picker control uses
+// native <input type="date"|"month"> which speaks the browser's local
+// time, so we always round-trip through `dateKey`/`fromDateKey`.
 
 function todayKsaKey(): string {
-  const ksa = new Date(Date.now() + KSA_OFFSET_HOURS * 3_600_000);
-  return `${ksa.getUTCFullYear()}-${String(ksa.getUTCMonth() + 1).padStart(2, '0')}-${String(ksa.getUTCDate()).padStart(2, '0')}`;
-}
-
-function parseKey(key: string): Date | null {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(key);
-  if (!m) return null;
-  return new Date(
-    Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) - KSA_OFFSET_HOURS * 3_600_000,
-  );
-}
-
-function toKey(d: Date): string {
-  const ksa = new Date(d.getTime() + KSA_OFFSET_HOURS * 3_600_000);
-  return `${ksa.getUTCFullYear()}-${String(ksa.getUTCMonth() + 1).padStart(2, '0')}-${String(ksa.getUTCDate()).padStart(2, '0')}`;
+  return dateKey(new Date());
 }
 
 // Snap any day to the Sunday that starts its KSA week.
 function snapToSunday(key: string): string {
-  const d = parseKey(key);
+  const d = fromDateKey(key);
   if (!d) return key;
-  const ksa = new Date(d.getTime() + KSA_OFFSET_HOURS * 3_600_000);
-  const dow = ksa.getUTCDay();
-  const sunday = new Date(ksa.getTime() - dow * MS_PER_DAY);
-  return `${sunday.getUTCFullYear()}-${String(sunday.getUTCMonth() + 1).padStart(2, '0')}-${String(sunday.getUTCDate()).padStart(2, '0')}`;
+  return dateKey(startOfKsaWeek(d));
 }
 
 function step(key: string, window: DashboardWindow, direction: 1 | -1): string {
-  const d = parseKey(key);
+  const d = fromDateKey(key);
   if (!d) return key;
-  if (window === 'day') return toKey(new Date(d.getTime() + direction * MS_PER_DAY));
-  if (window === 'week') return toKey(new Date(d.getTime() + direction * 7 * MS_PER_DAY));
-  const ksa = new Date(d.getTime() + KSA_OFFSET_HOURS * 3_600_000);
-  ksa.setUTCMonth(ksa.getUTCMonth() + direction);
-  return toKey(new Date(ksa.getTime() - KSA_OFFSET_HOURS * 3_600_000));
+  if (window === 'day') return dateKey(addDays(d, direction));
+  if (window === 'week') return dateKey(addWeeks(d, direction));
+  return dateKey(addMonths(d, direction));
 }
 
 export function Toolbar({

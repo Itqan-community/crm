@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 import type { SocialChannelKey } from './types';
 import { writeDailyRows, type MetricKey, type DailyRow } from './daily';
+import { dateKey } from './calendar';
 
 async function requireAdmin() {
   const supabase = await createSupabaseServerClient();
@@ -149,9 +150,11 @@ const SNAPSHOTABLE_KEYS = ['publishers', 'beneficiaries', 'consumption'] as cons
 type SnapshotKey = (typeof SNAPSHOTABLE_KEYS)[number];
 
 function todayKey(): string {
-  // Same convention as `todayISO()` in daily.ts — YYYY-MM-DD in the
-  // server's local time, which is UTC on Vercel.
-  return new Date().toISOString().slice(0, 10);
+  // YYYY-MM-DD in KSA wall time. Using UTC here would cause an admin
+  // saving a snapshot at, say, 02:30 KSA to land under the previous
+  // calendar day (21:30–24:00 UTC = next-day KSA), shifting the row by
+  // ±1 day relative to the cron's KSA-anchored captures.
+  return dateKey(new Date());
 }
 
 export async function saveCumulativeSnapshot(
