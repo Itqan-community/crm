@@ -1,11 +1,29 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import type { FormFieldRow, Bilingual } from '@/types/database';
+import type { FormFieldRow, Bilingual, SemanticRole } from '@/types/database';
 import { upsertField, deleteField, setFieldActive } from '@/lib/admin-actions';
 import { DialogActions, DialogField, DialogInput } from '../DialogPrimitives';
 
 type DeleteOutcome = { action: 'deleted' | 'disabled'; label: string };
+
+type FieldFormData = {
+  id?: string;
+  key: string;
+  kind: FormFieldRow['kind'];
+  label_ar: string;
+  label_en: string;
+  help_ar: string;
+  help_en: string;
+  placeholder_ar: string;
+  placeholder_en: string;
+  is_required: boolean;
+  is_multi: boolean;
+  options: Bilingual[];
+  semantic_role: SemanticRole | null;
+  position: number;
+  is_active: boolean;
+};
 
 const KINDS: { value: FormFieldRow['kind']; label: string }[] = [
   { value: 'text', label: 'نص قصير' },
@@ -108,8 +126,8 @@ export function FieldsAdmin({ categoryId, fields }: { categoryId: string; fields
                       try {
                         const result = await deleteField(f.id, categoryId);
                         announceDelete({ action: result.action, label: f.label_ar });
-                      } catch (e: any) {
-                        setError(e?.message ?? 'فشل الحذف');
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : 'فشل الحذف');
                       }
                     });
                   }}
@@ -128,8 +146,8 @@ export function FieldsAdmin({ categoryId, fields }: { categoryId: string; fields
                         await setFieldActive(f.id, categoryId, true);
                         setInfo(`تم إعادة تفعيل الحقل "${f.label_ar}".`);
                         window.setTimeout(() => setInfo(null), 4000);
-                      } catch (e: any) {
-                        setError(e?.message ?? 'فشل التفعيل');
+                      } catch (e) {
+                        setError(e instanceof Error ? e.message : 'فشل التفعيل');
                       }
                     });
                   }}
@@ -160,7 +178,12 @@ export function FieldsAdmin({ categoryId, fields }: { categoryId: string; fields
           onSave={(data) => {
             setError(null);
             startTransition(async () => {
-              try { await upsertField({ ...data, category_id: categoryId }); setEditing(null); } catch (e: any) { setError(e?.message ?? 'فشل الحفظ'); }
+              try {
+                await upsertField({ ...data, category_id: categoryId });
+                setEditing(null);
+              } catch (e) {
+                setError(e instanceof Error ? e.message : 'فشل الحفظ');
+              }
             });
           }}
           pending={pending}
@@ -173,10 +196,10 @@ export function FieldsAdmin({ categoryId, fields }: { categoryId: string; fields
 function FieldEditDialog({ initial, onCancel, onSave, pending }: {
   initial: Partial<FormFieldRow>;
   onCancel: () => void;
-  onSave: (data: any) => void;
+  onSave: (data: FieldFormData) => void;
   pending: boolean;
 }) {
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<FieldFormData>({
     id: initial.id,
     key: initial.key ?? '',
     kind: initial.kind ?? 'text',
@@ -188,8 +211,8 @@ function FieldEditDialog({ initial, onCancel, onSave, pending }: {
     placeholder_en: initial.placeholder_en ?? '',
     is_required: initial.is_required ?? false,
     is_multi: initial.is_multi ?? true,
-    options: (initial.options ?? []) as Bilingual[],
-    semantic_role: (initial.semantic_role ?? null) as string | null,
+    options: initial.options ?? [],
+    semantic_role: initial.semantic_role ?? null,
     position: initial.position ?? 0,
     is_active: initial.is_active ?? true,
   });
@@ -217,7 +240,7 @@ function FieldEditDialog({ initial, onCancel, onSave, pending }: {
           <DialogField label="placeholder (en)"><DialogInput value={form.placeholder_en} onChange={(v) => setForm({ ...form, placeholder_en: v })} dir="ltr" /></DialogField>
           <DialogField label="الترتيب"><DialogInput value={String(form.position)} onChange={(v) => setForm({ ...form, position: Number(v) || 0 })} dir="ltr" /></DialogField>
           <DialogField label="دور الحقل (semantic_role)">
-            <select value={form.semantic_role ?? ''} onChange={(e) => setForm({ ...form, semantic_role: (e.target.value || null) as typeof form.semantic_role })}
+            <select value={form.semantic_role ?? ''} onChange={(e) => setForm({ ...form, semantic_role: (e.target.value || null) as SemanticRole | null })}
               className="w-full px-3 py-2 rounded-lg border bg-transparent text-[13.5px]"
               style={{ borderColor: 'var(--rule)', color: 'var(--fg)' }}>
               {ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}

@@ -5,7 +5,7 @@
 
 import { NextResponse, type NextRequest } from 'next/server';
 import { backfillDailyMetrics } from '@/lib/dashboard/backfill';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { requireAdminApi } from '@/lib/admin-guard';
 
 export const dynamic = 'force-dynamic';
 // Backfill walks several source DBs; give it enough headroom on Pro.
@@ -15,19 +15,8 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
 export async function POST(request: NextRequest) {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
-  }
-  const { data: tm } = await supabase
-    .from('team_members')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle();
-  if (!tm || tm.role !== 'admin') {
-    return NextResponse.json({ error: 'admin_required' }, { status: 403 });
-  }
+  const auth = await requireAdminApi();
+  if (!auth.ok) return auth.response;
 
   const url = new URL(request.url);
   const daysParam = url.searchParams.get('days');

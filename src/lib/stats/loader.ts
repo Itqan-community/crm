@@ -14,6 +14,7 @@ import { getAnalytics } from './sources/analytics';
 import { getForum } from './sources/flarum';
 import { getQuranApps } from './sources/quran_apps';
 import { getCms } from './sources/cms';
+import { describeError } from './util';
 import type { DateRange, StatsBundle } from './types';
 
 const DEFAULT_WINDOW_DAYS = 7;
@@ -28,10 +29,6 @@ function makeRange(days: number): DateRange {
   const end = new Date();
   const start = new Date(end.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
   return { start, end };
-}
-
-function describeError(err: unknown): string {
-  return err instanceof Error ? err.message : String(err);
 }
 
 export async function loadStatsBundle(

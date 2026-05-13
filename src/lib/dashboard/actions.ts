@@ -1,24 +1,10 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { requireAdminAction } from '@/lib/admin-guard';
 import type { SocialChannelKey } from './types';
 import { writeDailyRows, type MetricKey, type DailyRow } from './daily';
 import { dateKey } from './calendar';
-
-async function requireAdmin() {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('unauthenticated');
-  const { data: tm } = await supabase
-    .from('team_members')
-    .select('id, role')
-    .eq('id', user.id)
-    .maybeSingle();
-  if (!tm) throw new Error('forbidden');
-  if (tm.role !== 'admin') throw new Error('admin_required');
-  return { supabase, user };
-}
 
 // Coerce a form-input string into a nullable integer. "" → null so the
 // row column stays unset rather than defaulting to 0 (which would mean
@@ -43,7 +29,7 @@ export type SaveSocialInput = {
 };
 
 export async function saveSocialSnapshot(input: SaveSocialInput) {
-  const { supabase, user } = await requireAdmin();
+  const { supabase, user } = await requireAdminAction();
 
   // Sanitize the extras blob — the form ships e.g. { likes: "31" } and
   // we want { likes: 31 } in the DB. Drop empty entries entirely so
@@ -92,7 +78,7 @@ export type WeeklyMetricInput = {
 // integers/floats (the form ships e.g. "12" not 12) and drops empty
 // meta fields so the jsonb stays minimal.
 export async function saveWeeklyMetrics(input: WeeklyMetricInput[]) {
-  await requireAdmin();
+  await requireAdminAction();
   if (!Array.isArray(input) || input.length === 0) return { written: 0 };
 
   const rows: DailyRow[] = input.map((row) => {
@@ -160,7 +146,7 @@ function todayKey(): string {
 export async function saveCumulativeSnapshot(
   input: CumulativeSnapshotInput,
 ): Promise<{ written: number; day: string }> {
-  await requireAdmin();
+  await requireAdminAction();
   const day = todayKey();
   const rows: DailyRow[] = [];
   for (const key of SNAPSHOTABLE_KEYS) {

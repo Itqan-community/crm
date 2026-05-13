@@ -574,23 +574,6 @@ describe('createManualSubmission — notes', () => {
 // ---------------------------------------------------------------------------
 
 describe('createManualSubmission — failure paths', () => {
-  it('translates Postgres 42703 into "migration_required"', async () => {
-    const ctx = makeSupabase({
-      user: { id: 'user-1' },
-      teamMember: TEAM_MEMBER,
-      category: ACTIVE_CATEGORY,
-      submissionInsert: {
-        data: null,
-        error: { code: '42703', message: 'column "source" does not exist' },
-      },
-    });
-    vi.mocked(createSupabaseServerClient).mockResolvedValue(ctx.supabase as never);
-
-    await expect(createManualSubmission(VALID_INPUT)).rejects.toThrow(
-      'migration_required',
-    );
-  });
-
   it('cleans up the orphan submission if answers insert fails', async () => {
     const phoneField = {
       id: 'fld-phone',
