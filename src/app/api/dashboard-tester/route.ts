@@ -6,6 +6,7 @@
 //   GET  /api/dashboard-tester                    → diagnostics JSON
 //   GET  /api/dashboard-tester?action=backfill&days=30 → run backfill
 //   GET  /api/dashboard-tester?action=capture     → write today's snapshot
+//   GET  /api/dashboard-tester?action=campaigns   → raw MailerLite payload
 //
 // All variants require:
 //   Authorization: Bearer ${CRON_SECRET}
@@ -18,8 +19,8 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { sourceConfigured, SOURCE_LABELS } from '@/lib/stats/env';
 import { backfillDailyMetrics } from '@/lib/dashboard/backfill';
-import { writeDailyRows, todayISO, ALL_METRIC_KEYS, type MetricKey, type DailyRow } from '@/lib/dashboard/daily';
-import { loadStatsBundle } from '@/lib/stats/loader';
+import { captureTodaySnapshot } from '@/lib/dashboard/capture';
+import { ALL_METRIC_KEYS } from '@/lib/dashboard/daily';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
@@ -109,8 +110,8 @@ export async function GET(request: NextRequest) {
 
   if (action === 'capture') {
     try {
-      const written = await captureToday();
-      return NextResponse.json({ ok: true, action: 'capture', ...written });
+      const { day, written, skippedManual } = await captureTodaySnapshot();
+      return NextResponse.json({ ok: true, action: 'capture', day, written, skippedManual });
     } catch (e) {
       return NextResponse.json(
         { ok: false, action: 'capture', error: e instanceof Error ? e.message : String(e) },
@@ -162,55 +163,4 @@ export async function GET(request: NextRequest) {
     metrics,
     hint: 'POST/GET ?action=backfill&days=30 to populate · ?action=capture to write today',
   });
-}
-
-// Reusable today's-snapshot capture (same logic as the cron route,
-// extracted so this endpoint can offer it on demand).
-async function captureToday(): Promise<{ written: number; day: string }> {
-  const bundle = await loadStatsBundle({ windowDays: 1 });
-  const day = todayISO();
-  const rows: DailyRow[] = [];
-
-  if (bundle.forum) {
-    const discussions = bundle.forum.newDiscussions ?? 0;
-    const replies = bundle.forum.newReplies ?? 0;
-    const likes = bundle.forum.newLikes ?? 0;
-    const new_users = bundle.forum.newUsers ?? 0;
-    const active_users = bundle.forum.activeUsers ?? 0;
-    rows.push({
-      day,
-      metric_key: 'engagement',
-      value: discussions + replies + likes,
-      meta: { discussions, replies, likes, new_users, active_users },
-    });
-    rows.push({ day, metric_key: 'shares', value: bundle.forum.totalLikes ?? 0 });
-  }
-  if (bundle.newsletter?.lastCampaign) {
-    const c = bundle.newsletter.lastCampaign;
-    const opens =
-      c.opens > 0 ? c.opens : Math.round((c.sent * c.openRate) / 100);
-    rows.push({
-      day,
-      metric_key: 'newsletter',
-      value: c.sent,
-      meta: { rate: c.openRate, prevRate: bundle.newsletter.last7Days.avgOpenRate, opened: opens },
-    });
-  }
-  if (bundle.analytics) {
-    const a = bundle.analytics;
-    rows.push({
-      day,
-      metric_key: 'site_visits',
-      value: a.pageviews.value,
-      meta: { uniq: a.activeUsers.value, returning: Math.max(0, a.sessions.value - a.newUsers) },
-    });
-  }
-  if (bundle.cms) {
-    rows.push({ day, metric_key: 'publishers',    value: bundle.cms.totalPublishers });
-    rows.push({ day, metric_key: 'beneficiaries', value: bundle.cms.totalUsers });
-    rows.push({ day, metric_key: 'consumption',   value: bundle.cms.totalAssets });
-  }
-
-  const result = await writeDailyRows(rows);
-  return { ...result, day };
 }

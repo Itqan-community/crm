@@ -7,36 +7,28 @@ import { LogoutButton } from '@/components/admin/LogoutButton';
 export const dynamic = 'force-dynamic';
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
+  // /admin/login + /admin/auth/callback live under this layout too — when
+  // no session is present we render the page bare (no sidebar). When the
+  // user is signed in but isn't on team_members, we drop the session and
+  // push them back to login.
   const supabase = await createSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return <>{children}</>;
 
-  // Login + callback render outside this layout? No — they're under /admin.
-  // We keep this layout for both states. If unauthenticated (and not on login),
-  // middleware already redirects. But layout still renders /admin/login.
-  // So we only render the chrome when we have a team_member row.
-  let teamRole: string | null = null;
-  if (user) {
-    const { data: tm } = await supabase
-      .from('team_members')
-      .select('role')
-      .eq('id', user.id)
-      .maybeSingle();
-    teamRole = tm?.role ?? null;
-    if (!teamRole) {
-      // Authenticated but not on the team — push back to login with error.
-      await supabase.auth.signOut();
-      redirect('/admin/login?error=not_authorized');
-    }
+  const { data: tm } = await supabase
+    .from('team_members')
+    .select('role')
+    .eq('id', user.id)
+    .maybeSingle();
+  if (!tm) {
+    await supabase.auth.signOut();
+    redirect('/admin/login?error=not_authorized');
   }
-
-  if (!user) {
-    // Login page renders without chrome
-    return <>{children}</>;
-  }
+  const member = tm as { role: 'admin' | 'member' };
 
   return (
     <div className="min-h-screen flex" style={{ background: 'var(--bg)', color: 'var(--fg)' }}>
-      <Sidebar role={teamRole as 'admin' | 'member'} />
+      <Sidebar role={member.role} />
       <div className="flex-1 flex flex-col min-w-0">
         <header
           className="border-b px-4 md:px-6 pb-3 flex items-center justify-between gap-3"
@@ -50,7 +42,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           }}
         >
           <div className="flex items-center gap-3 min-w-0">
-            <MobileNav role={teamRole as 'admin' | 'member'} />
+            <MobileNav role={member.role} />
             <div className="text-[13px] truncate" style={{ color: 'var(--muted)' }}>
               مرحباً، <span style={{ color: 'var(--fg)', fontWeight: 500 }}>{user.email}</span>
             </div>

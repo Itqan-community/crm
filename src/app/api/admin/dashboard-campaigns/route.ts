@@ -5,23 +5,14 @@
 // compare against the source numbers.
 
 import { NextResponse, type NextRequest } from 'next/server';
-import { createSupabaseServerClient } from '@/lib/supabase/server';
+import { requireAdminApi } from '@/lib/admin-guard';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
-  const supabase = await createSupabaseServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: 'unauthenticated' }, { status: 401 });
-  const { data: tm } = await supabase
-    .from('team_members')
-    .select('role')
-    .eq('id', user.id)
-    .maybeSingle();
-  if (!tm || tm.role !== 'admin') {
-    return NextResponse.json({ error: 'admin_required' }, { status: 403 });
-  }
+  const auth = await requireAdminApi();
+  if (!auth.ok) return auth.response;
 
   // ?raw=1 mode: hit MailerLite directly and dump the unparsed JSON.
   // Lets us see exactly what fields the API returns — or if it errors,
