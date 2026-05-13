@@ -92,6 +92,12 @@ export type ForumMetrics = {
   newUsers: number;
   newDiscussions: number;
   newPosts: number;
+  // Posts minus discussions = posts that aren't the first-post of a
+  // new thread, i.e. true replies. Flarum creates a `posts` row when
+  // a discussion starts, so this subtraction is the only honest count
+  // of replies-only.
+  newReplies: number;
+  newLikes: number;
   activeUsers: number;
   avgPostsPerDiscussion: number;
 };

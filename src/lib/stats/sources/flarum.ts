@@ -69,6 +69,7 @@ export async function getForum(opts: {
       totalPosts,
       newPosts,
       totalLikes,
+      newLikes,
     ] = await Promise.all([
       num('SELECT COUNT(*) AS c FROM users', []),
       num('SELECT COUNT(*) AS c FROM users WHERE joined_at >= ? AND joined_at <= ?', [startStr, endStr]),
@@ -78,6 +79,7 @@ export async function getForum(opts: {
       num('SELECT COUNT(*) AS c FROM posts', []),
       num('SELECT COUNT(*) AS c FROM posts WHERE created_at >= ? AND created_at <= ?', [startStr, endStr]),
       numOrZero('SELECT COUNT(*) AS c FROM post_likes', []),
+      numOrZero('SELECT COUNT(*) AS c FROM post_likes WHERE created_at >= ? AND created_at <= ?', [startStr, endStr]),
     ]);
 
     return {
@@ -88,6 +90,8 @@ export async function getForum(opts: {
       newUsers,
       newDiscussions,
       newPosts,
+      newReplies: Math.max(0, newPosts - newDiscussions),
+      newLikes,
       activeUsers,
       avgPostsPerDiscussion:
         totalDiscussions > 0 ? totalPosts / totalDiscussions : 0,

@@ -13,10 +13,12 @@ type Item = {
 };
 
 const ITEMS: Item[] = [
-  { href: '/admin',                       label: 'الطلبات',          icon: InboxIcon,    adminOnly: false },
-  { href: '/admin/stats',                 label: 'البيانات',          icon: BarChartIcon, adminOnly: false },
-  { href: '/admin/settings',              label: 'الحالات والفريق', icon: UsersIcon,    adminOnly: true  },
-  { href: '/admin/settings/form-builder', label: 'بناء النموذج',    icon: WrenchIcon,   adminOnly: true  },
+  { href: '/admin',                       label: 'اللوحة',           icon: DashboardIcon, adminOnly: false },
+  { href: '/admin/submissions',           label: 'الطلبات',          icon: InboxIcon,     adminOnly: false },
+  { href: '/admin/stats',                 label: 'البيانات الخام',  icon: BarChartIcon,  adminOnly: false },
+  { href: '/admin/settings/metrics',      label: 'بيانات اللوحة',    icon: SlidersIcon,   adminOnly: true  },
+  { href: '/admin/settings',              label: 'الحالات والفريق', icon: UsersIcon,     adminOnly: true  },
+  { href: '/admin/settings/form-builder', label: 'بناء النموذج',    icon: WrenchIcon,    adminOnly: true  },
 ];
 
 const STORAGE_KEY = 'itqan_sidebar_collapsed';
@@ -128,6 +130,17 @@ function CollapseIcon({ flipped }: { flipped: boolean }) {
   );
 }
 
+function DashboardIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="9" rx="1.5" />
+      <rect x="14" y="3" width="7" height="5" rx="1.5" />
+      <rect x="14" y="12" width="7" height="9" rx="1.5" />
+      <rect x="3" y="16" width="7" height="5" rx="1.5" />
+    </svg>
+  );
+}
+
 function InboxIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -152,6 +165,19 @@ function WrenchIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.4 2.4-2.6-2.6 2.4-2.4z" />
+    </svg>
+  );
+}
+
+function SlidersIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <line x1="4" y1="18" x2="20" y2="18" />
+      <circle cx="9" cy="6" r="2" fill="var(--bg)" />
+      <circle cx="15" cy="12" r="2" fill="var(--bg)" />
+      <circle cx="7" cy="18" r="2" fill="var(--bg)" />
     </svg>
   );
 }
