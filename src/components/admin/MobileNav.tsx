@@ -17,10 +17,7 @@ type Item = {
 // admin gating. The sidebar is `hidden md:flex`, which previously left
 // mobile users with zero navigation. This drawer fills that gap.
 const ITEMS: Item[] = [
-  { href: '/admin',                       label: 'اللوحة',           icon: DashboardIcon, adminOnly: false },
   { href: '/admin/submissions',           label: 'الطلبات',          icon: InboxIcon,     adminOnly: false },
-  { href: '/admin/stats',                 label: 'البيانات الخام',  icon: BarChartIcon,  adminOnly: false },
-  { href: '/admin/settings/metrics',      label: 'بيانات اللوحة',    icon: SlidersIcon,   adminOnly: true  },
   { href: '/admin/settings',              label: 'الحالات والفريق', icon: UsersIcon,     adminOnly: true  },
   { href: '/admin/settings/form-builder', label: 'بناء النموذج',    icon: WrenchIcon,    adminOnly: true  },
 ];
@@ -185,17 +182,6 @@ function CloseIcon() {
   );
 }
 
-function DashboardIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <rect x="3" y="3" width="7" height="9" rx="1.5" />
-      <rect x="14" y="3" width="7" height="5" rx="1.5" />
-      <rect x="14" y="12" width="7" height="9" rx="1.5" />
-      <rect x="3" y="16" width="7" height="5" rx="1.5" />
-    </svg>
-  );
-}
-
 function InboxIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
@@ -224,25 +210,3 @@ function WrenchIcon({ size = 18 }: { size?: number }) {
   );
 }
 
-function SlidersIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="4" y1="6" x2="20" y2="6" />
-      <line x1="4" y1="12" x2="20" y2="12" />
-      <line x1="4" y1="18" x2="20" y2="18" />
-      <circle cx="9" cy="6" r="2" fill="var(--bg)" />
-      <circle cx="15" cy="12" r="2" fill="var(--bg)" />
-      <circle cx="7" cy="18" r="2" fill="var(--bg)" />
-    </svg>
-  );
-}
-
-function BarChartIcon({ size = 18 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-      <line x1="12" y1="20" x2="12" y2="10" />
-      <line x1="18" y1="20" x2="18" y2="4" />
-      <line x1="6" y1="20" x2="6" y2="14" />
-    </svg>
-  );
-}

@@ -38,7 +38,7 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isLogin && user) {
-    return NextResponse.redirect(new URL('/admin', url));
+    return NextResponse.redirect(new URL('/admin/submissions', url));
   }
 
   return response;
