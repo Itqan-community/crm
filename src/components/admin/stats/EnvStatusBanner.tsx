@@ -107,7 +107,8 @@ export async function EnvStatusBanner() {
             {cronSecretSet ? '✓' : '⚠'}
           </span>
           <span className="truncate">
-            مفتاح الكرون (CRON_SECRET){cronSecretSet ? '' : ' — غير مضبوط'}
+            مفتاح الكرون (CRON_SECRET)
+            {cronSecretSet ? '' : ' — غير مضبوط، الالتقاط اليومي متوقف'}
           </span>
         </div>
         {!cronSecretSet && (

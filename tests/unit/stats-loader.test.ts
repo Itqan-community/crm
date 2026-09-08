@@ -29,7 +29,15 @@ afterEach(() => {
   vi.doUnmock('@/lib/stats/sources/cms');
 });
 
-function mockSource(path: string, fn: () => Promise<unknown>) {
+function mockSource(
+  path: string,
+  fn: () => Promise<unknown>,
+  // flarum exports two collectors; the loader calls both, so a mock
+  // that supplies only getForum would throw before allSettled catches
+  // anything. Default the tiers to null (= source not configured).
+  tiersFn?: () => Promise<unknown>,
+) {
+  const tiers = tiersFn ?? (async () => null);
   vi.doMock(path, () => {
     const exportName = ({
       '@/lib/stats/sources/mailerlite': 'getNewsletter',
@@ -39,15 +47,20 @@ function mockSource(path: string, fn: () => Promise<unknown>) {
       '@/lib/stats/sources/quran_apps': 'getQuranApps',
       '@/lib/stats/sources/cms': 'getCms',
     } as Record<string, string>)[path];
-    return { [exportName!]: fn };
+    return path === '@/lib/stats/sources/flarum'
+      ? { getForum: fn, getForumEngagementTiers: tiers }
+      : { [exportName!]: fn };
   });
 }
 
-function mockAllNull() {
+// `tiersFn` overrides only the flarum tiers collector. Pass it here
+// rather than re-mocking the flarum path afterwards: a second doMock
+// for a path already registered does not reliably replace the first.
+function mockAllNull(tiersFn?: () => Promise<unknown>) {
   mockSource('@/lib/stats/sources/mailerlite', async () => null);
   mockSource('@/lib/stats/sources/github', async () => null);
   mockSource('@/lib/stats/sources/analytics', async () => null);
-  mockSource('@/lib/stats/sources/flarum', async () => null);
+  mockSource('@/lib/stats/sources/flarum', async () => null, tiersFn);
   mockSource('@/lib/stats/sources/quran_apps', async () => null);
   mockSource('@/lib/stats/sources/cms', async () => null);
 }
@@ -116,6 +129,67 @@ describe('loadStatsBundle', () => {
     expect(new Date(b3.range.end).getTime()).toBeGreaterThan(
       new Date(b3.range.start).getTime(),
     );
+  });
+
+  it('opens the window at UTC midnight, so windowDays=1 is not zero-width', async () => {
+    // Regression: makeRange used to return start === end for days=1,
+    // which is what the daily capture asks for. Every "new X in the
+    // window" count came back 0, so the cron wrote empty engagement
+    // rows even when the forum was busy.
+    mockAllNull();
+    const { loadStatsBundle } = await import('@/lib/stats/loader');
+
+    const b = await loadStatsBundle({ windowDays: 1 });
+    const start = new Date(b.range.start);
+    const end = new Date(b.range.end);
+    expect(end.getTime()).toBeGreaterThan(start.getTime());
+    expect(b.range.start).toMatch(/T00:00:00\.000Z$/);
+    expect(start.toISOString().slice(0, 10)).toBe(end.toISOString().slice(0, 10));
+  });
+
+  it('spans `windowDays` calendar days inclusive of today', async () => {
+    mockAllNull();
+    const { loadStatsBundle } = await import('@/lib/stats/loader');
+
+    const b = await loadStatsBundle({ windowDays: 7 });
+    const startDay = Date.parse(`${b.range.start.slice(0, 10)}T00:00:00Z`);
+    const endDay = Date.parse(`${b.range.end.slice(0, 10)}T00:00:00Z`);
+    // 6 whole days between the first and last day = 7 days inclusive.
+    expect(Math.round((endDay - startDay) / 86_400_000)).toBe(6);
+  });
+
+  it('carries forum engagement tiers through the bundle', async () => {
+    const tiers = {
+      browsers: 66,
+      returningReaders: 30,
+      likedOrPosted: 38,
+      posted: 32,
+      posted3Plus: 15,
+      posted10Plus: 6,
+      previousWindow: { start: '2026-08-26T00:00:00.000Z', end: '2026-09-01T00:00:00.000Z' },
+    };
+    mockAllNull(async () => tiers);
+
+    const { loadStatsBundle } = await import('@/lib/stats/loader');
+    const b = await loadStatsBundle({ windowDays: 7 });
+    expect(b.forumTiers).toEqual(tiers);
+    expect(b.errors).toEqual([]);
+  });
+
+  it('files a tiers failure under the forum source without losing others', async () => {
+    mockAllNull(async () => {
+      throw new Error('post_likes missing');
+    });
+
+    const { loadStatsBundle } = await import('@/lib/stats/loader');
+    const b = await loadStatsBundle();
+    expect(b.forumTiers).toBeNull();
+    expect(b.errors.find((e) => e.source === 'forum')?.message).toContain(
+      'post_likes missing',
+    );
+    // The neighbouring slots must not shift when tiers rejects.
+    expect(b.quranApps).toBeNull();
+    expect(b.cms).toBeNull();
   });
 
   it('returns a generatedAt ISO string', async () => {

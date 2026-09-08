@@ -11,7 +11,7 @@ import { type StatsSource } from './env';
 import { getNewsletter } from './sources/mailerlite';
 import { getGithub } from './sources/github';
 import { getAnalytics } from './sources/analytics';
-import { getForum } from './sources/flarum';
+import { getForum, getForumEngagementTiers } from './sources/flarum';
 import { getQuranApps } from './sources/quran_apps';
 import { getCms } from './sources/cms';
 import { describeError } from './util';
@@ -25,9 +25,18 @@ export type LoadOptions = {
   windowDays?: number;
 };
 
+// `days` counts calendar days INCLUDING today, so the window opens at
+// 00:00 UTC of (today − (days−1)) — the same bucket boundary
+// backfill.ts uses when it groups by DATE(created_at).
+//
+// The midnight snap is load-bearing: without it `days = 1` (what the
+// daily capture asks for) produced start === end === now, a zero-width
+// window, and every "new X in this window" count came back 0. Wider
+// windows lost the hours-so-far slice of their first day.
 function makeRange(days: number): DateRange {
   const end = new Date();
   const start = new Date(end.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+  start.setUTCHours(0, 0, 0, 0);
   return { start, end };
 }
 
@@ -43,14 +52,18 @@ export async function loadStatsBundle(
     getGithub({ range }),
     getAnalytics({ range }),
     getForum({ range }),
+    getForumEngagementTiers({ range }),
     getQuranApps(),
     getCms(),
   ]);
 
+  // Tiers share the forum's env var and error bucket — a failure there
+  // is still "the forum source is broken" as far as the banner cares.
   const sources: StatsSource[] = [
     'newsletter',
     'github',
     'analytics',
+    'forum',
     'forum',
     'quranApps',
     'cms',
@@ -67,14 +80,16 @@ export async function loadStatsBundle(
     return r.value;
   });
 
-  const [newsletter, github, analytics, forum, quranApps, cms] = values as [
-    StatsBundle['newsletter'],
-    StatsBundle['github'],
-    StatsBundle['analytics'],
-    StatsBundle['forum'],
-    StatsBundle['quranApps'],
-    StatsBundle['cms'],
-  ];
+  const [newsletter, github, analytics, forum, forumTiers, quranApps, cms] =
+    values as [
+      StatsBundle['newsletter'],
+      StatsBundle['github'],
+      StatsBundle['analytics'],
+      StatsBundle['forum'],
+      StatsBundle['forumTiers'],
+      StatsBundle['quranApps'],
+      StatsBundle['cms'],
+    ];
 
   return {
     range: {
@@ -86,6 +101,7 @@ export async function loadStatsBundle(
     github,
     analytics,
     forum,
+    forumTiers,
     quranApps,
     cms,
     errors,

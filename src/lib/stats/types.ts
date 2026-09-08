@@ -102,6 +102,37 @@ export type ForumMetrics = {
   avgPostsPerDiscussion: number;
 };
 
+// Distinct PEOPLE per activity depth over the whole window — the
+// "lurkers vs active" split. Not derivable from ForumMetrics: those
+// are event counts, and summing a daily active-user count across a
+// week yields user-days rather than people.
+//
+// The tiers are CUMULATIVE, not disjoint buckets: someone with 12
+// posts is counted in browsers, likedOrPosted, posted, posted3Plus
+// AND posted10Plus. Adding them together double-counts and means
+// nothing. They nest —
+//   posted10Plus ≤ posted3Plus ≤ posted ≤ likedOrPosted ≤ browsers
+// — but only while the window ends at "now": that is what guarantees
+// a poster's `last_seen_at` still falls inside it. `returningReaders`
+// sits outside the chain entirely; it comes from a different table
+// and is not a subset of any other tier.
+export type ForumEngagementTiers = {
+  // Signed in at least once. Approximate — see getForumEngagementTiers.
+  browsers: number;
+  // Read in this window AND the previous one. null when unavailable;
+  // a proxy even when present, and biased low.
+  returningReaders: number | null;
+  // Posted or liked at least once.
+  likedOrPosted: number;
+  // Wrote at least one post or reply.
+  posted: number;
+  posted3Plus: number;
+  posted10Plus: number;
+  // Echoed back so the UI can state which window "returning" compares
+  // against instead of leaving the reader to guess.
+  previousWindow: { start: string; end: string };
+};
+
 // ---- Quran Apps Directory ----------------------------------------------------
 
 export type QuranAppsMetrics = {
@@ -145,6 +176,7 @@ export type StatsBundle = {
   github: GithubMetrics | null;
   analytics: AnalyticsMetrics | null;
   forum: ForumMetrics | null;
+  forumTiers: ForumEngagementTiers | null;
   quranApps: QuranAppsMetrics | null;
   cms: CmsMetrics | null;
   errors: StatsErrorEntry[];

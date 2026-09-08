@@ -1,5 +1,6 @@
 import { requireTeamPage } from '@/lib/admin-guard';
 import { loadStatsBundle } from '@/lib/stats/loader';
+import { BackfillButton } from '@/components/admin/dashboard/BackfillButton';
 import { EnvStatusBanner } from '@/components/admin/stats/EnvStatusBanner';
 import { RefreshButton } from '@/components/admin/stats/RefreshButton';
 import { StatsTable } from '@/components/admin/stats/StatsTable';
@@ -11,9 +12,8 @@ export default async function AdminStatsPage({
 }: {
   searchParams: Promise<{ days?: string }>;
 }) {
-  // requireTeamPage redirects internally on missing auth — no need to
-  // re-check its return value.
-  await requireTeamPage();
+  // requireTeamPage redirects internally on missing auth.
+  const { member } = await requireTeamPage();
 
   const sp = await searchParams;
   const parsed = Number.parseInt(sp.days ?? '', 10);
@@ -46,6 +46,18 @@ export default async function AdminStatsPage({
       </header>
 
       <EnvStatusBanner />
+
+      {/* The freshness chips above read dashboard_metric_daily, which
+          only the daily cron and this backfill ever write to. Without a
+          control here the chips are a dead end: the refresh button next
+          to the range switch re-reads the live sources for the table
+          below and nothing else. The endpoint requires admin, so only
+          admins get the button. */}
+      {member.role === 'admin' && (
+        <div className="mb-4">
+          <BackfillButton days={120} />
+        </div>
+      )}
 
       {bundle.errors.length > 0 && (
         <div

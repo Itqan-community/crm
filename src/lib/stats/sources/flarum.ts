@@ -11,8 +11,8 @@
 // `created_at`, `discussion_id`, ...). We mirror those.
 
 import { STATS_ENV } from '../env';
-import type { DateRange, ForumMetrics } from '../types';
-import { describeError } from '../util';
+import type { DateRange, ForumEngagementTiers, ForumMetrics } from '../types';
+import { describeError, previousWindow } from '../util';
 
 function fmtDate(d: Date): string {
   return d.toISOString().slice(0, 19).replace('T', ' ');
@@ -108,4 +108,159 @@ export async function getForum(opts: {
       }
     }
   }
+}
+
+// ---- Engagement tiers (lurkers → power posters) -----------------------------
+
+// Counts DISTINCT PEOPLE per activity depth in the window, which is a
+// different question from the event counts getForum() returns: summing
+// a daily "active users" count across a week gives user-days, not
+// people. These have to be computed over the whole window at once.
+//
+// Two of the six are honest approximations, and the types say so:
+//
+//   browsers          `users.last_seen_at` holds only the MOST RECENT
+//                     visit, so anyone who came back after the window
+//                     closed is invisible here. Accurate for a window
+//                     ending today, lossy for any older one.
+//   returningReaders  Flarum keeps no login history, so there is no
+//                     exact answer. `discussion_user.last_read_at` is
+//                     one timestamp per (user, discussion) pair, which
+//                     gives a user several datapoints across threads —
+//                     enough for a proxy, but re-reading a thread
+//                     overwrites its marker, so this undercounts.
+//                     null when the query fails (older schema).
+export async function getForumEngagementTiers(opts: {
+  range: DateRange;
+}): Promise<ForumEngagementTiers | null> {
+  if (!STATS_ENV.FLARUM_DB_URL) return null;
+
+  type Mysql = typeof import('mysql2/promise');
+  let mysql: Mysql;
+  try {
+    mysql = (await import('mysql2/promise')) as Mysql;
+  } catch (err) {
+    console.warn('[stats:forum-tiers] mysql2 import failed:', describeError(err));
+    return null;
+  }
+
+  let conn: Awaited<ReturnType<Mysql['createConnection']>> | null = null;
+  try {
+    conn = await mysql.createConnection({
+      uri: STATS_ENV.FLARUM_DB_URL,
+      connectTimeout: 10_000,
+    });
+
+    const start = fmtDate(opts.range.start);
+    const end = fmtDate(opts.range.end);
+
+    // previousWindow() returns day-granularity Dates for GA, whose
+    // dateRanges treat `end` as an INCLUSIVE calendar date. Compared as
+    // a timestamp instead, that same `end` is midnight at the *start*
+    // of its last day and silently drops the whole of it — a 7-day
+    // window shrinks to 6. So bound the previous window by the current
+    // window's start, exclusive: [prev.start, range.start) is exactly
+    // as long as the current window and directly abuts it, with no gap
+    // and no overlap.
+    const prevStart = fmtDate(previousWindow(opts.range).start);
+
+    // `type = 'comment'` excludes Flarum's synthetic event posts
+    // (discussionRenamed, discussionTagged, ...), which are rows in
+    // `posts` but are not something a person wrote. Note getForum()
+    // and backfill.ts deliberately do NOT filter this way — their
+    // counts are raw post volume, so their numbers run slightly higher.
+    const POSTERS = `
+      SELECT user_id, COUNT(*) AS c
+      FROM posts
+      WHERE created_at >= ? AND created_at <= ?
+        AND type = 'comment' AND hidden_at IS NULL AND user_id IS NOT NULL
+      GROUP BY user_id`;
+
+    const [tiersRows] = (await conn.execute(
+      `SELECT COUNT(*) AS posted,
+              COALESCE(SUM(c >= 3), 0)  AS posted3,
+              COALESCE(SUM(c >= 10), 0) AS posted10
+       FROM (${POSTERS}) t`,
+      [start, end],
+    )) as unknown as [Array<Record<string, number | string | null>>];
+
+    const [browserRows] = (await conn.execute(
+      'SELECT COUNT(*) AS c FROM users WHERE last_seen_at >= ? AND last_seen_at <= ?',
+      [start, end],
+    )) as unknown as [Array<{ c: number | string }>];
+
+    // UNION (not UNION ALL) dedupes, so someone who both posted and
+    // liked is one person. If post_likes is missing — the Likes
+    // extension is optional — this degrades to the posters alone,
+    // which is the correct union against an empty set.
+    let likedOrPosted: number;
+    try {
+      const [rows] = (await conn.execute(
+        `SELECT COUNT(*) AS c FROM (
+           SELECT user_id FROM posts
+             WHERE created_at >= ? AND created_at <= ?
+               AND type = 'comment' AND hidden_at IS NULL AND user_id IS NOT NULL
+           UNION
+           SELECT user_id FROM post_likes
+             WHERE created_at >= ? AND created_at <= ? AND user_id IS NOT NULL
+         ) u`,
+        [start, end, start, end],
+      )) as unknown as [Array<{ c: number | string }>];
+      likedOrPosted = num(rows[0]?.c);
+    } catch {
+      likedOrPosted = num(tiersRows[0]?.posted);
+    }
+
+    let returningReaders: number | null = null;
+    try {
+      const [rows] = (await conn.execute(
+        // The self-join fans out to (rows in window × rows in previous
+        // window) per user; COUNT(DISTINCT a.user_id) collapses that
+        // back to one per person, so the fan-out cannot inflate it.
+        `SELECT COUNT(DISTINCT a.user_id) AS c
+         FROM discussion_user a
+         JOIN discussion_user b ON b.user_id = a.user_id
+         WHERE a.last_read_at >= ? AND a.last_read_at <= ?
+           AND b.last_read_at >= ? AND b.last_read_at < ?`,
+        [start, end, prevStart, start],
+      )) as unknown as [Array<{ c: number | string }>];
+      returningReaders = num(rows[0]?.c);
+    } catch (err) {
+      console.warn('[stats:forum-tiers] returning readers:', describeError(err));
+    }
+
+    return {
+      browsers: num(browserRows[0]?.c),
+      returningReaders,
+      likedOrPosted,
+      posted: num(tiersRows[0]?.posted),
+      posted3Plus: num(tiersRows[0]?.posted3),
+      posted10Plus: num(tiersRows[0]?.posted10),
+      // `end` is the exclusive bound actually used — the current
+      // window's start — not an inclusive last day.
+      previousWindow: {
+        start: previousWindow(opts.range).start.toISOString(),
+        end: opts.range.start.toISOString(),
+      },
+    };
+  } catch (err) {
+    console.warn('[stats:forum-tiers] fetch failed:', describeError(err));
+    throw err;
+  } finally {
+    if (conn) {
+      try {
+        await conn.end();
+      } catch {
+        // ignore — already closed / network gone
+      }
+    }
+  }
+}
+
+// COUNT/SUM come back as number, bigint or a decimal string depending
+// on the driver and the aggregate; normalize once.
+function num(raw: number | bigint | string | null | undefined): number {
+  if (raw == null) return 0;
+  if (typeof raw === 'bigint') return Number(raw);
+  return Number(raw) || 0;
 }

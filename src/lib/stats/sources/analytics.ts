@@ -15,23 +15,7 @@
 
 import { STATS_ENV } from '../env';
 import type { AnalyticsMetrics, ChangeMetric, DateRange } from '../types';
-import { describeError } from '../util';
-
-function isoDay(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function previousWindow(range: DateRange): DateRange {
-  const days = Math.max(
-    1,
-    Math.round(
-      (range.end.getTime() - range.start.getTime()) / (1000 * 60 * 60 * 24),
-    ),
-  );
-  const end = new Date(range.start.getTime() - 24 * 60 * 60 * 1000);
-  const start = new Date(end.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
-  return { start, end };
-}
+import { describeError, isoDay, previousWindow } from '../util';
 
 export async function getAnalytics(opts: {
   range: DateRange;

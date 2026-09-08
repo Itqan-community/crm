@@ -32,7 +32,11 @@ export function RefreshButton() {
         <polyline points="1 20 1 14 7 14" />
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
       </svg>
-      <span>{pending ? 'جارٍ التحديث…' : 'تحديث البيانات'}</span>
+      {/* Deliberately NOT "تحديث البيانات" — this only re-reads the live
+          sources for the table below. It writes nothing to
+          dashboard_metric_daily, so the freshness chips never move on
+          its account; the backfill card does that. */}
+      <span>{pending ? 'جارٍ التحديث…' : 'تحديث المصادر الحيّة'}</span>
     </button>
   );
 }
