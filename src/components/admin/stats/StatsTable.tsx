@@ -382,10 +382,100 @@ export function StatsTable({ bundle }: { bundle: StatsBundle }) {
   const sections = buildSections(bundle);
   return (
     <div className="space-y-6">
+      <EngagementTiers bundle={bundle} />
       {sections.map((s) => (
         <SectionBlock key={s.title} section={s} />
       ))}
     </div>
+  );
+}
+
+// Distinct people by activity depth, widest tier first. Ordered so the
+// funnel reads right-to-left in RTL: many browsers → few power posters.
+function EngagementTiers({ bundle }: { bundle: StatsBundle }) {
+  const t = bundle.forumTiers;
+  if (!t) return null;
+  const days = bundle.range.days;
+
+  const cards: Array<{
+    label: string;
+    value: number | null;
+    hint: string;
+    approx?: string;
+  }> = [
+    {
+      label: 'متصفحون',
+      value: t.browsers,
+      hint: 'سجّلوا الدخول على الأقل',
+      approx:
+        'يعتمد على last_seen_at، وهو آخر ظهور فقط — من عاد بعد نهاية النطاق لا يُحتسب',
+    },
+    {
+      label: 'قراء عائدون',
+      value: t.returningReaders,
+      hint: `قرأوا في النطاق وفي الـ${days} يوماً السابقة له`,
+      approx:
+        'تقريب عبر discussion_user.last_read_at — يُستبدل عند إعادة قراءة النقاش، فالرقم أقل من الحقيقة',
+    },
+    { label: 'لايك أو منشور أو رد', value: t.likedOrPosted, hint: 'تفاعل واحد على الأقل' },
+    { label: 'منشور أو رد', value: t.posted, hint: 'مشاركة كتابية واحدة' },
+    { label: '3 منشورات أو ردود على الأقل', value: t.posted3Plus, hint: 'نشاط متوسط (+3)' },
+    { label: '10 منشورات أو ردود فما فوق', value: t.posted10Plus, hint: 'نشاط مرتفع (+10)' },
+  ];
+
+  return (
+    <section
+      className="rounded-xl border overflow-hidden"
+      style={{ borderColor: 'var(--rule-soft)', background: 'var(--surface)' }}
+    >
+      <header className="px-4 py-3 border-b" style={{ borderColor: 'var(--rule-soft)' }}>
+        <h2 className="text-[15px] font-semibold" style={{ color: 'var(--fg)' }}>
+          مستويات التفاعل (Lurkers vs Active)
+        </h2>
+        <p className="text-[12.5px] mt-0.5" style={{ color: 'var(--muted)' }}>
+          أشخاص متمايزون خلال آخر {days} {days === 1 ? 'يوم' : 'أيام'} — لا عدد
+          أحداث. مصدرها Flarum مباشرة.
+        </p>
+      </header>
+      <div className="p-4 grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+        {cards.map((c) => (
+          <div
+            key={c.label}
+            className="rounded-lg border p-3 flex flex-col gap-1"
+            style={{ borderColor: 'var(--rule-soft)' }}
+          >
+            <div className="text-[12px] font-medium" style={{ color: 'var(--fg)' }}>
+              {c.label}
+              {c.approx && (
+                <span title={c.approx} style={{ color: '#d97706' }}>
+                  {' '}≈
+                </span>
+              )}
+            </div>
+            <div
+              className="text-[22px] font-semibold tabular-nums"
+              dir="ltr"
+              style={{ color: c.value == null ? 'var(--muted)' : 'var(--fg)' }}
+            >
+              {intOrDash(c.value)}
+            </div>
+            <div className="text-[11.5px] leading-snug" style={{ color: 'var(--muted)' }}>
+              {c.hint}
+            </div>
+          </div>
+        ))}
+      </div>
+      <p
+        className="px-4 pb-3 text-[11.5px] leading-relaxed"
+        style={{ color: 'var(--muted)' }}
+      >
+        البطاقتان المعلَّمتان بـ<span style={{ color: '#d97706' }}> ≈ </span>
+        تقريبية: Flarum لا يحتفظ بسجل دخول تاريخي. الأربع الباقية دقيقة، وتحسب
+        منشورات <code dir="ltr">type=&apos;comment&apos;</code> غير المخفية فقط —
+        فهي أقل قليلاً من أرقام «تفاعل المنتدى» أدناه، التي تعدّ صفوف{' '}
+        <code dir="ltr">posts</code> كلها بما فيها أحداث النظام.
+      </p>
+    </section>
   );
 }
 

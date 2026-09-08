@@ -102,6 +102,27 @@ export type ForumMetrics = {
   avgPostsPerDiscussion: number;
 };
 
+// Distinct PEOPLE per activity depth over the whole window — the
+// "lurkers vs active" split. Not derivable from ForumMetrics: those
+// are event counts, and summing a daily active-user count across a
+// week yields user-days rather than people.
+export type ForumEngagementTiers = {
+  // Signed in at least once. Approximate — see getForumEngagementTiers.
+  browsers: number;
+  // Read in this window AND the previous one. null when unavailable;
+  // a proxy even when present, and biased low.
+  returningReaders: number | null;
+  // Posted or liked at least once.
+  likedOrPosted: number;
+  // Wrote at least one post or reply.
+  posted: number;
+  posted3Plus: number;
+  posted10Plus: number;
+  // Echoed back so the UI can state which window "returning" compares
+  // against instead of leaving the reader to guess.
+  previousWindow: { start: string; end: string };
+};
+
 // ---- Quran Apps Directory ----------------------------------------------------
 
 export type QuranAppsMetrics = {
@@ -145,6 +166,7 @@ export type StatsBundle = {
   github: GithubMetrics | null;
   analytics: AnalyticsMetrics | null;
   forum: ForumMetrics | null;
+  forumTiers: ForumEngagementTiers | null;
   quranApps: QuranAppsMetrics | null;
   cms: CmsMetrics | null;
   errors: StatsErrorEntry[];

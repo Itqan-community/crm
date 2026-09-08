@@ -15,24 +15,7 @@
 
 import { STATS_ENV } from '../env';
 import type { AnalyticsMetrics, ChangeMetric, DateRange } from '../types';
-import { describeError } from '../util';
-
-function isoDay(d: Date): string {
-  return d.toISOString().slice(0, 10);
-}
-
-function previousWindow(range: DateRange): DateRange {
-  // Size the comparison window in CALENDAR days, inclusive of both
-  // ends — the same unit GA's dateRanges speak. A raw millisecond
-  // difference would wobble with the time of day (range.end is "now",
-  // range.start is midnight), sizing the window differently run to run.
-  const startDay = Date.parse(`${isoDay(range.start)}T00:00:00Z`);
-  const endDay = Date.parse(`${isoDay(range.end)}T00:00:00Z`);
-  const days = Math.max(1, Math.round((endDay - startDay) / 86_400_000) + 1);
-  const end = new Date(startDay - 86_400_000);
-  const start = new Date(end.getTime() - (days - 1) * 86_400_000);
-  return { start, end };
-}
+import { describeError, isoDay, previousWindow } from '../util';
 
 export async function getAnalytics(opts: {
   range: DateRange;
