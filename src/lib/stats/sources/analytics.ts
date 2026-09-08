@@ -22,14 +22,15 @@ function isoDay(d: Date): string {
 }
 
 function previousWindow(range: DateRange): DateRange {
-  const days = Math.max(
-    1,
-    Math.round(
-      (range.end.getTime() - range.start.getTime()) / (1000 * 60 * 60 * 24),
-    ),
-  );
-  const end = new Date(range.start.getTime() - 24 * 60 * 60 * 1000);
-  const start = new Date(end.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+  // Size the comparison window in CALENDAR days, inclusive of both
+  // ends — the same unit GA's dateRanges speak. A raw millisecond
+  // difference would wobble with the time of day (range.end is "now",
+  // range.start is midnight), sizing the window differently run to run.
+  const startDay = Date.parse(`${isoDay(range.start)}T00:00:00Z`);
+  const endDay = Date.parse(`${isoDay(range.end)}T00:00:00Z`);
+  const days = Math.max(1, Math.round((endDay - startDay) / 86_400_000) + 1);
+  const end = new Date(startDay - 86_400_000);
+  const start = new Date(end.getTime() - (days - 1) * 86_400_000);
   return { start, end };
 }
 

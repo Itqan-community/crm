@@ -25,9 +25,18 @@ export type LoadOptions = {
   windowDays?: number;
 };
 
+// `days` counts calendar days INCLUDING today, so the window opens at
+// 00:00 UTC of (today − (days−1)) — the same bucket boundary
+// backfill.ts uses when it groups by DATE(created_at).
+//
+// The midnight snap is load-bearing: without it `days = 1` (what the
+// daily capture asks for) produced start === end === now, a zero-width
+// window, and every "new X in this window" count came back 0. Wider
+// windows lost the hours-so-far slice of their first day.
 function makeRange(days: number): DateRange {
   const end = new Date();
   const start = new Date(end.getTime() - (days - 1) * 24 * 60 * 60 * 1000);
+  start.setUTCHours(0, 0, 0, 0);
   return { start, end };
 }
 

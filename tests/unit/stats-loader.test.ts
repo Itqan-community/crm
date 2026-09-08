@@ -118,6 +118,33 @@ describe('loadStatsBundle', () => {
     );
   });
 
+  it('opens the window at UTC midnight, so windowDays=1 is not zero-width', async () => {
+    // Regression: makeRange used to return start === end for days=1,
+    // which is what the daily capture asks for. Every "new X in the
+    // window" count came back 0, so the cron wrote empty engagement
+    // rows even when the forum was busy.
+    mockAllNull();
+    const { loadStatsBundle } = await import('@/lib/stats/loader');
+
+    const b = await loadStatsBundle({ windowDays: 1 });
+    const start = new Date(b.range.start);
+    const end = new Date(b.range.end);
+    expect(end.getTime()).toBeGreaterThan(start.getTime());
+    expect(b.range.start).toMatch(/T00:00:00\.000Z$/);
+    expect(start.toISOString().slice(0, 10)).toBe(end.toISOString().slice(0, 10));
+  });
+
+  it('spans `windowDays` calendar days inclusive of today', async () => {
+    mockAllNull();
+    const { loadStatsBundle } = await import('@/lib/stats/loader');
+
+    const b = await loadStatsBundle({ windowDays: 7 });
+    const startDay = Date.parse(`${b.range.start.slice(0, 10)}T00:00:00Z`);
+    const endDay = Date.parse(`${b.range.end.slice(0, 10)}T00:00:00Z`);
+    // 6 whole days between the first and last day = 7 days inclusive.
+    expect(Math.round((endDay - startDay) / 86_400_000)).toBe(6);
+  });
+
   it('returns a generatedAt ISO string', async () => {
     mockAllNull();
     const { loadStatsBundle } = await import('@/lib/stats/loader');
