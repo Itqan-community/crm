@@ -40,6 +40,17 @@ export default async function AdminStatsPage({
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <a
+            href="/admin/stats/forum"
+            className="px-3 py-2 rounded-lg border text-[12.5px] transition"
+            style={{
+              borderColor: 'var(--rule)',
+              color: 'var(--accent-strong)',
+              background: 'var(--option-bg-selected)',
+            }}
+          >
+            أرقام المنتدى الأسبوعية
+          </a>
           <RangeSwitch current={windowDays} />
           <RefreshButton />
         </div>

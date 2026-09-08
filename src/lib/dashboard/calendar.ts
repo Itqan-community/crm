@@ -152,6 +152,10 @@ const HIJRI_DM = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-arab', 
   month: 'long',
   timeZone: 'Asia/Riyadh',
 });
+const HIJRI_D = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-arab', {
+  day: 'numeric',
+  timeZone: 'Asia/Riyadh',
+});
 const HIJRI_MONTH_YEAR = new Intl.DateTimeFormat('ar-SA-u-ca-islamic-umalqura-nu-arab', {
   month: 'long',
   year: 'numeric',
@@ -167,6 +171,10 @@ const GREG_LONG = new Intl.DateTimeFormat('ar-EG', {
 const GREG_DM = new Intl.DateTimeFormat('ar-EG', {
   day: 'numeric',
   month: 'long',
+  timeZone: 'Asia/Riyadh',
+});
+const GREG_D = new Intl.DateTimeFormat('ar-EG', {
+  day: 'numeric',
   timeZone: 'Asia/Riyadh',
 });
 const GREG_MONTH_YEAR = new Intl.DateTimeFormat('ar-EG', {
@@ -205,6 +213,35 @@ export function formatGregorianRange(start: Date, end: Date): string {
     return `${GREG_DM.format(start)} – ${GREG_LONG.format(end)}`;
   }
   return `${GREG_LONG.format(start)} – ${GREG_LONG.format(end)}`;
+}
+
+function hijriMonthOf(d: Date): string | undefined {
+  return HIJRI_DM.formatToParts(d).find((p) => p.type === 'month')?.value;
+}
+function gregMonthOf(d: Date): string | undefined {
+  return GREG_DM.formatToParts(d).find((p) => p.type === 'month')?.value;
+}
+
+// Compact, year-less range labels for dense column headers where the
+// year is already established by the surrounding page:
+//   same month     → "١٤ – ٢٠ ذو الحجة"
+//   crossing month → "٢٨ ذو الحجة – ٥ محرم"
+// A week never spans the same month name in two different years, so
+// comparing month names alone is safe here.
+export function formatHijriRangeCompact(start: Date, end: Date): string {
+  if (sameKsaDay(start, end)) return HIJRI_DM.format(start);
+  if (hijriMonthOf(start) === hijriMonthOf(end)) {
+    return `${HIJRI_D.format(start)} – ${HIJRI_DM.format(end)}`;
+  }
+  return `${HIJRI_DM.format(start)} – ${HIJRI_DM.format(end)}`;
+}
+
+export function formatGregorianRangeCompact(start: Date, end: Date): string {
+  if (sameKsaDay(start, end)) return GREG_DM.format(start);
+  if (gregMonthOf(start) === gregMonthOf(end)) {
+    return `${GREG_D.format(start)} – ${GREG_DM.format(end)}`;
+  }
+  return `${GREG_DM.format(start)} – ${GREG_DM.format(end)}`;
 }
 
 export function formatPeriodHijri(p: PeriodRange): string {
