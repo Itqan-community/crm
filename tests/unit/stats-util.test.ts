@@ -28,6 +28,25 @@ describe('previousWindow', () => {
     expect(isoDay(early.end)).toBe(isoDay(late.end));
   });
 
+  it('abuts the current window exactly when bounded by range.start', () => {
+    // The forum tiers compare [prev.start, range.start) as TIMESTAMPS.
+    // previousWindow().end is day-granularity — midnight at the START
+    // of its last day — which GA reads as an inclusive calendar date
+    // but a timestamp comparison would truncate, shrinking a 7-day
+    // window to 6. Bounding by range.start instead keeps the two
+    // windows equal in length, contiguous, and non-overlapping.
+    const range = {
+      start: new Date('2026-09-02T00:00:00Z'),
+      end: new Date('2026-09-08T13:36:02Z'),
+    };
+    const prev = previousWindow(range);
+
+    const prevSpanDays = (range.start.getTime() - prev.start.getTime()) / 86_400_000;
+    expect(prevSpanDays).toBe(7);
+    // Using prev.end as the timestamp bound is what loses the day.
+    expect((prev.end.getTime() - prev.start.getTime()) / 86_400_000).toBe(6);
+  });
+
   it('handles a single-day window', () => {
     const range = {
       start: new Date('2026-09-08T00:00:00Z'),

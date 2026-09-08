@@ -153,9 +153,16 @@ export async function getForumEngagementTiers(opts: {
 
     const start = fmtDate(opts.range.start);
     const end = fmtDate(opts.range.end);
-    const prev = previousWindow(opts.range);
-    const prevStart = fmtDate(prev.start);
-    const prevEnd = fmtDate(prev.end);
+
+    // previousWindow() returns day-granularity Dates for GA, whose
+    // dateRanges treat `end` as an INCLUSIVE calendar date. Compared as
+    // a timestamp instead, that same `end` is midnight at the *start*
+    // of its last day and silently drops the whole of it — a 7-day
+    // window shrinks to 6. So bound the previous window by the current
+    // window's start, exclusive: [prev.start, range.start) is exactly
+    // as long as the current window and directly abuts it, with no gap
+    // and no overlap.
+    const prevStart = fmtDate(previousWindow(opts.range).start);
 
     // `type = 'comment'` excludes Flarum's synthetic event posts
     // (discussionRenamed, discussionTagged, ...), which are rows in
@@ -194,7 +201,8 @@ export async function getForumEngagementTiers(opts: {
              WHERE created_at >= ? AND created_at <= ?
                AND type = 'comment' AND hidden_at IS NULL AND user_id IS NOT NULL
            UNION
-           SELECT user_id FROM post_likes WHERE created_at >= ? AND created_at <= ?
+           SELECT user_id FROM post_likes
+             WHERE created_at >= ? AND created_at <= ? AND user_id IS NOT NULL
          ) u`,
         [start, end, start, end],
       )) as unknown as [Array<{ c: number | string }>];
@@ -206,12 +214,15 @@ export async function getForumEngagementTiers(opts: {
     let returningReaders: number | null = null;
     try {
       const [rows] = (await conn.execute(
+        // The self-join fans out to (rows in window × rows in previous
+        // window) per user; COUNT(DISTINCT a.user_id) collapses that
+        // back to one per person, so the fan-out cannot inflate it.
         `SELECT COUNT(DISTINCT a.user_id) AS c
          FROM discussion_user a
          JOIN discussion_user b ON b.user_id = a.user_id
          WHERE a.last_read_at >= ? AND a.last_read_at <= ?
-           AND b.last_read_at >= ? AND b.last_read_at <= ?`,
-        [start, end, prevStart, prevEnd],
+           AND b.last_read_at >= ? AND b.last_read_at < ?`,
+        [start, end, prevStart, start],
       )) as unknown as [Array<{ c: number | string }>];
       returningReaders = num(rows[0]?.c);
     } catch (err) {
@@ -225,7 +236,12 @@ export async function getForumEngagementTiers(opts: {
       posted: num(tiersRows[0]?.posted),
       posted3Plus: num(tiersRows[0]?.posted3),
       posted10Plus: num(tiersRows[0]?.posted10),
-      previousWindow: { start: prev.start.toISOString(), end: prev.end.toISOString() },
+      // `end` is the exclusive bound actually used — the current
+      // window's start — not an inclusive last day.
+      previousWindow: {
+        start: previousWindow(opts.range).start.toISOString(),
+        end: opts.range.start.toISOString(),
+      },
     };
   } catch (err) {
     console.warn('[stats:forum-tiers] fetch failed:', describeError(err));

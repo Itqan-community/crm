@@ -106,6 +106,16 @@ export type ForumMetrics = {
 // "lurkers vs active" split. Not derivable from ForumMetrics: those
 // are event counts, and summing a daily active-user count across a
 // week yields user-days rather than people.
+//
+// The tiers are CUMULATIVE, not disjoint buckets: someone with 12
+// posts is counted in browsers, likedOrPosted, posted, posted3Plus
+// AND posted10Plus. Adding them together double-counts and means
+// nothing. They nest —
+//   posted10Plus ≤ posted3Plus ≤ posted ≤ likedOrPosted ≤ browsers
+// — but only while the window ends at "now": that is what guarantees
+// a poster's `last_seen_at` still falls inside it. `returningReaders`
+// sits outside the chain entirely; it comes from a different table
+// and is not a subset of any other tier.
 export type ForumEngagementTiers = {
   // Signed in at least once. Approximate — see getForumEngagementTiers.
   browsers: number;

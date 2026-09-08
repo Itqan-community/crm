@@ -434,7 +434,8 @@ function EngagementTiers({ bundle }: { bundle: StatsBundle }) {
         </h2>
         <p className="text-[12.5px] mt-0.5" style={{ color: 'var(--muted)' }}>
           أشخاص متمايزون خلال آخر {days} {days === 1 ? 'يوم' : 'أيام'} — لا عدد
-          أحداث. مصدرها Flarum مباشرة.
+          أحداث. مصدرها Flarum مباشرة. الشرائح <strong>متداخلة لا منفصلة</strong>:
+          صاحب 12 مشاركة محسوب في كل بطاقة تنطبق عليه، فلا تُجمع البطاقات معاً.
         </p>
       </header>
       <div className="p-4 grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
