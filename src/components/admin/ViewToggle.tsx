@@ -12,7 +12,8 @@ export function ViewToggle({ current }: { current: AdminView }) {
     const next = new URLSearchParams(sp.toString());
     if (view === 'kanban') next.delete('view');
     else next.set('view', view);
-    router.push('/admin' + (next.toString() ? '?' + next.toString() : ''));
+    // Real list path — /admin redirects and drops the query string.
+    router.push('/admin/submissions' + (next.toString() ? '?' + next.toString() : ''));
   };
 
   return (
