@@ -13,6 +13,8 @@ const LABELS: Record<string, string> = {
   status_changed: 'تغيير الحالة',
   assigned: 'تعيين مسؤول',
   note_added: 'إضافة ملاحظة',
+  tag_added: 'إضافة تصنيف',
+  tag_removed: 'إزالة تصنيف',
   newsletter_subscribed: 'تم الاشتراك في النشرة',
   newsletter_failed: 'تعذّر الاشتراك في النشرة',
   email_failed: 'تعذّر إرسال بريد التأكيد',
@@ -23,10 +25,12 @@ export function ActivityFeed({
   activity,
   statusesById,
   teamById,
+  tagsById = {},
 }: {
   activity: Activity[];
   statusesById: Record<string, { label_ar: string }>;
   teamById: Record<string, { label: string }>;
+  tagsById?: Record<string, { label_ar: string }>;
 }) {
   return (
     <div className="rounded-xl border p-5" style={{ borderColor: 'var(--rule)' }}>
@@ -48,7 +52,7 @@ export function ActivityFeed({
                 </span>
               </div>
               <div className="text-[12px]" style={{ color: 'var(--muted)' }}>
-                {describeMeta(a.action, a.meta, statusesById, teamById)}
+                {describeMeta(a.action, a.meta, statusesById, teamById, tagsById)}
                 {' · '}
                 <LocalTime iso={a.created_at} />
               </div>
@@ -65,6 +69,7 @@ function describeMeta(
   meta: Record<string, unknown>,
   statusesById: Record<string, { label_ar: string }>,
   teamById: Record<string, { label: string }>,
+  tagsById: Record<string, { label_ar: string }>,
 ): string {
   // RTL note: in Arabic the visual flow goes right-to-left, so the "from →
   // to" arrow has to point left ("←") to read as forward progress. Using
@@ -78,6 +83,9 @@ function describeMeta(
     const from = meta.from ? teamById[String(meta.from)]?.label || '—' : 'بلا';
     const to = meta.to ? teamById[String(meta.to)]?.label || '—' : 'بلا';
     return `${from} ← ${to}`;
+  }
+  if (action === 'tag_added' || action === 'tag_removed') {
+    return tagsById[String(meta.tag_id || '')]?.label_ar || '';
   }
   if (action === 'created' && meta.reference_no) {
     return `الرقم المرجعي: ${meta.reference_no}`;

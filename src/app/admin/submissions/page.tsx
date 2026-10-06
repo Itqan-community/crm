@@ -5,6 +5,8 @@ import {
   loadStatuses,
   loadCategories,
   loadTeam,
+  loadTags,
+  loadTagGroups,
 } from '@/lib/admin-queries';
 import { loadActiveFormSchema } from '@/lib/form-schema';
 
@@ -19,19 +21,22 @@ export default async function AdminSubmissions({
     status?: string;
     assignee?: string;
     source?: string;
+    tags?: string;
     view?: string;
     include_archived?: string;
   }>;
 }) {
   const sp = await searchParams;
   const view: AdminView = sp.view === 'table' ? 'table' : 'kanban';
-  const [rows, statuses, allCategories, team, schema] = await Promise.all([
+  const [rows, statuses, allCategories, team, tags, groups, schema] = await Promise.all([
     loadSubmissions(sp),
     loadStatuses(),
     // Filter dropdown shows every category (incl. inactive ones still tied to
     // legacy submissions); the manual-entry modal only offers active ones.
     loadCategories(true),
     loadTeam(),
+    loadTags(),
+    loadTagGroups(),
     loadActiveFormSchema(),
   ]);
 
@@ -44,6 +49,8 @@ export default async function AdminSubmissions({
       activeCategories={schema.categories}
       fieldsByCategory={schema.fieldsByCategory}
       team={team}
+      tags={tags}
+      groups={groups}
     />
   );
 }

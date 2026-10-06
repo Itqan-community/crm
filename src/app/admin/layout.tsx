@@ -31,7 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <Sidebar role={member.role} />
       <div className="flex-1 flex flex-col min-w-0">
         <header
-          className="border-b px-4 md:px-6 pb-3 flex items-center justify-between gap-3"
+          className="border-b px-4 md:px-6 pb-3 flex items-center justify-between gap-3 print:hidden"
           style={{
             borderColor: 'var(--rule-soft)',
             // calc folds the safe-area inset into our existing 12px top

@@ -14,6 +14,7 @@ type Item = {
 
 const ITEMS: Item[] = [
   { href: '/admin/submissions',           label: 'الطلبات',          icon: InboxIcon,     adminOnly: false },
+  { href: '/admin/tags',                  label: 'التصنيفات',        icon: TagIcon,       adminOnly: false },
   { href: '/admin/settings',              label: 'الحالات والفريق', icon: UsersIcon,     adminOnly: true  },
   { href: '/admin/settings/form-builder', label: 'بناء النموذج',    icon: WrenchIcon,    adminOnly: true  },
 ];
@@ -45,7 +46,7 @@ export function Sidebar({ role }: { role: 'admin' | 'member' }) {
 
   return (
     <aside
-      className="border-l shrink-0 hidden md:flex md:flex-col transition-[width] duration-200"
+      className="border-l shrink-0 hidden md:flex md:flex-col print:hidden transition-[width] duration-200"
       style={{
         width: isCollapsed ? 64 : 240,
         borderColor: 'var(--rule-soft)',
@@ -132,6 +133,15 @@ function InboxIcon({ size = 18 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
       <path d="M22 12h-6l-2 3h-4l-2-3H2" />
       <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </svg>
+  );
+}
+
+function TagIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z" />
+      <circle cx="7.5" cy="7.5" r="0.5" fill="currentColor" />
     </svg>
   );
 }

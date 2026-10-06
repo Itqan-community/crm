@@ -119,11 +119,46 @@ export interface NoteRow {
   updated_at: string;
 }
 
+// A tag's `kind` references tag_groups.key — the group is an
+// admin-defined classification axis (general, availability, …more via
+// /admin/tags), not a fixed enum.
+export interface TagGroupRow {
+  key: string;
+  label_ar: string;
+  label_en: string;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TagRow {
+  id: string;
+  key: string;
+  label_ar: string;
+  label_en: string;
+  kind: string;
+  color: string;
+  position: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SubmissionTagRow {
+  submission_id: string;
+  tag_id: string;
+  assigned_by: string | null;
+  created_at: string;
+}
+
 export type ActivityAction =
   | 'created'
   | 'status_changed'
   | 'assigned'
   | 'note_added'
+  | 'tag_added'
+  | 'tag_removed'
   | 'newsletter_subscribed'
   | 'newsletter_failed'
   | 'email_failed'
