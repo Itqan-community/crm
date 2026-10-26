@@ -17,8 +17,17 @@ export const STEP_GROUPS: SemanticRole[][] = [
 // step is one or more FormFieldRow objects that share a STEP_GROUPS entry.
 // Every field appears in exactly one step. Fields outside any group are
 // standalone single-field steps.
+//
+// Quick forms: a category with three or fewer active fields skips the
+// multi-step dance entirely — one screen, one submit. Quick-capture
+// categories like "زيارات" (name/phone/workplace) are the target; every
+// long category keeps its existing step layout untouched.
 export function buildStepPlan(fields: FormFieldRow[]): FormFieldRow[][] {
   const sorted = [...fields].sort((a, b) => a.position - b.position);
+  if (sorted.length > 0 && sorted.length <= 3) {
+    return [sorted];
+  }
+
   const consumed = new Set<string>();
   const steps: FormFieldRow[][] = [];
 

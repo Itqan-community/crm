@@ -66,18 +66,21 @@ export async function POST(req: Request) {
     }
   }
 
-  // Extract semantic fields
+  // Extract semantic fields. Email is optional at the category level:
+  // quick forms like "زيارات" reach the team by phone alone, and the
+  // manual-entry path already allows email-or-phone. submitter_email is
+  // NOT NULL in the DB, so phone-only submissions store an empty string.
   const findBySemantic = (role: SemanticRole) => fieldsTyped.find((f) => f.semantic_role === role);
   const nameField = findBySemantic('name');
   const emailField = findBySemantic('email');
   const newsletterField = findBySemantic('newsletter');
 
-  if (!nameField || !emailField) {
+  if (!nameField) {
     return NextResponse.json({ error: 'category_missing_identity_fields' }, { status: 500 });
   }
 
   const nameVal = (answerById.get(nameField.id)?.value ?? '') as string;
-  const emailVal = (answerById.get(emailField.id)?.value ?? '') as string;
+  const emailVal = emailField ? ((answerById.get(emailField.id)?.value ?? '') as string) : '';
 
   let newsletterOptin = false;
   if (newsletterField) {
@@ -86,13 +89,14 @@ export async function POST(req: Request) {
   }
 
   // Insert submission
+  const trimmedEmail = String(emailVal).trim().toLowerCase();
   const { data: submissionRows, error: subErr } = await supabase
     .from('submissions')
     .insert({
       category_id: payload.category_id,
       language: lang,
       submitter_name: String(nameVal).trim(),
-      submitter_email: String(emailVal).trim().toLowerCase(),
+      submitter_email: trimmedEmail,
       newsletter_optin: newsletterOptin,
     })
     .select('id, reference_no, category_id')
@@ -170,17 +174,20 @@ export async function POST(req: Request) {
           referenceNo: submissionRows.reference_no,
           categoryLabel,
           submitterName: String(nameVal),
-          submitterEmail: String(emailVal),
+          submitterEmail: trimmedEmail,
           submissionUrl,
         }),
-        sendSubmitterConfirmation({
-          to: String(emailVal),
-          name: String(nameVal),
-          referenceNo: submissionRows.reference_no,
-          lang,
-        }),
-        newsletterOptin
-          ? subscribeToNewsletter({ name: String(nameVal), email: String(emailVal) })
+        // Phone-only submissions have nowhere to send a confirmation.
+        trimmedEmail
+          ? sendSubmitterConfirmation({
+              to: trimmedEmail,
+              name: String(nameVal),
+              referenceNo: submissionRows.reference_no,
+              lang,
+            })
+          : Promise.resolve(true),
+        newsletterOptin && trimmedEmail
+          ? subscribeToNewsletter({ name: String(nameVal), email: trimmedEmail })
           : Promise.resolve(true),
       ]);
 
