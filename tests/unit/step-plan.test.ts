@@ -68,15 +68,40 @@ describe('buildStepPlan', () => {
     ]);
   });
 
-  it('leaves ungrouped fields as standalone steps', () => {
+  it('leaves ungrouped fields as standalone steps (4+ fields)', () => {
+    // 4 fields: above the quick-form threshold, so grouping applies.
     const fields = [
       field('a', 10, null),
       field('b', 20, null),
       field('c', 30, null),
+      field('d', 40, null),
     ];
     const plan = buildStepPlan(fields);
-    expect(plan.length).toBe(3);
-    expect(plan.flat().map((f) => f.key)).toEqual(['a', 'b', 'c']);
+    expect(plan.length).toBe(4);
+    expect(plan.flat().map((f) => f.key)).toEqual(['a', 'b', 'c', 'd']);
+  });
+
+  it('quick form: a category with ≤3 fields renders as one single step', () => {
+    // visits category shape: name + phone + workplace, no email.
+    const fields = [
+      field('name', 10, 'name'),
+      field('phone', 20, 'phone'),
+      field('workplace', 30, null),
+    ];
+    const plan = buildStepPlan(fields);
+    expect(plan.length).toBe(1);
+    expect(plan[0].map((f) => f.key)).toEqual(['name', 'phone', 'workplace']);
+  });
+
+  it('quick-form threshold: exactly 4 fields keeps multi-step behavior', () => {
+    const fields = [
+      field('name', 10, 'name'),
+      field('email', 20, 'email'),
+      field('phone', 25, 'phone'),
+      field('message', 30, null),
+    ];
+    const plan = buildStepPlan(fields);
+    expect(plan.length).toBeGreaterThan(1);
   });
 
   it('preserves position order within a grouped step', () => {
@@ -109,11 +134,15 @@ describe('buildStepPlan', () => {
     const fields = [
       field('random', 10, null),
       field('newsletter', 20, 'newsletter'), // newsletter is a role but not in STEP_GROUPS
+      field('extra1', 30, null),
+      field('extra2', 40, null),
     ];
     const plan = buildStepPlan(fields);
     expect(plan.map((s) => s.map((f) => f.key))).toEqual([
       ['random'],
       ['newsletter'],
+      ['extra1'],
+      ['extra2'],
     ]);
   });
 

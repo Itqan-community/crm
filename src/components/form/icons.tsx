@@ -123,6 +123,12 @@ export const IconPhone = (p: IconProps) => (
   </SvgIcon>
 );
 
+export const IconBolt = (p: IconProps) => (
+  <FaCategoryIcon {...p}>
+    <path d="M384 64L192 384h96l-48 192 224-288h-96l80-224z" />
+  </FaCategoryIcon>
+);
+
 export const CATEGORY_ICONS: Record<string, (p: IconProps) => JSX.Element> = {
   book: IconBook,
   app: IconApp,
@@ -130,6 +136,7 @@ export const CATEGORY_ICONS: Record<string, (p: IconProps) => JSX.Element> = {
   briefcase: IconBriefcase,
   message: IconMessage,
   handshake: IconHandshake,
+  bolt: IconBolt,
 };
 
 export function categoryIcon(key: string | null | undefined) {
