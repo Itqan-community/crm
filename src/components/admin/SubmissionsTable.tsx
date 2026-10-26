@@ -7,6 +7,7 @@ import { archiveSubmissions } from '@/lib/admin-actions';
 import { StatusBadge } from './StatusBadge';
 import { CategoryBadge } from './CategoryBadge';
 import { SourceBadge } from './SourceBadge';
+import { Tag } from './Tag';
 import { LocalTime } from './LocalTime';
 
 type Props = {
@@ -98,6 +99,7 @@ export function SubmissionsTable({ rows }: Props) {
               <Th>الاسم</Th>
               <Th>البريد</Th>
               <Th>الفئة</Th>
+              <Th>التصنيفات</Th>
               <Th>المصدر</Th>
               <Th>الحالة</Th>
               <Th>المسؤول</Th>
@@ -107,7 +109,7 @@ export function SubmissionsTable({ rows }: Props) {
           <tbody>
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center" style={{ color: 'var(--muted)' }}>
+                <td colSpan={10} className="px-4 py-12 text-center" style={{ color: 'var(--muted)' }}>
                   لا توجد طلبات تطابق هذه الفلاتر.
                 </td>
               </tr>
@@ -151,6 +153,22 @@ export function SubmissionsTable({ rows }: Props) {
                       <CategoryBadge label={r.category.label_ar} categoryKey={r.category.key} />
                     ) : (
                       '—'
+                    )}
+                  </Td>
+                  <Td>
+                    {r.tags.length > 0 ? (
+                      <div className="flex flex-wrap gap-1 max-w-[220px]">
+                        {r.tags.slice(0, 3).map((t) => (
+                          <Tag key={t.id} color={t.color}>{t.label_ar}</Tag>
+                        ))}
+                        {r.tags.length > 3 && (
+                          <span className="text-[11px] self-center" style={{ color: 'var(--muted)' }}>
+                            +{r.tags.length - 3}
+                          </span>
+                        )}
+                      </div>
+                    ) : (
+                      <span style={{ color: 'var(--muted)' }}>—</span>
                     )}
                   </Td>
                   <Td>

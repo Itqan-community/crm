@@ -7,6 +7,8 @@ import type {
   FormCategoryRow,
   FormFieldRow,
   StatusRow,
+  TagGroupRow,
+  TagRow,
   TeamMemberRow,
 } from '@/types/database';
 import type { SubmissionListRow } from '@/lib/admin-queries';
@@ -53,6 +55,9 @@ type Props = {
   activeCategories: FormCategoryRow[];
   fieldsByCategory: Record<string, FormFieldRow[]>;
   team: TeamMemberRow[];
+  // Active person tags + their groups for the filter bar dropdown.
+  tags: TagRow[];
+  groups: TagGroupRow[];
 };
 
 // Owns the modal open state, the source-filter, and a transient success
@@ -67,6 +72,8 @@ export function AdminListClient({
   activeCategories,
   fieldsByCategory,
   team,
+  tags,
+  groups,
 }: Props) {
   const sp = useSearchParams();
   const sourceFilter = sp.get('source') ?? '';
@@ -126,7 +133,7 @@ export function AdminListClient({
         </div>
       </div>
 
-      <FilterBar categories={filterCategories} statuses={statuses} team={team} />
+      <FilterBar categories={filterCategories} statuses={statuses} team={team} tags={tags} groups={groups} />
 
       {toast && (
         <div

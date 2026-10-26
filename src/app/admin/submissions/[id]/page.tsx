@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { notFound, redirect } from 'next/navigation';
 import { createSupabaseServerClient } from '@/lib/supabase/server';
-import { loadStatuses, loadTeam } from '@/lib/admin-queries';
+import { loadStatuses, loadTeam, loadTags, loadTagGroups, loadSubmissionTags } from '@/lib/admin-queries';
 import { StatusEditor } from '@/components/admin/StatusEditor';
 import { AssigneePicker } from '@/components/admin/AssigneePicker';
+import { TagPicker } from '@/components/admin/TagPicker';
 import { NotesPanel } from '@/components/admin/NotesPanel';
 import { ActivityFeed } from '@/components/admin/ActivityFeed';
 import { LocalTime } from '@/components/admin/LocalTime';
@@ -88,6 +89,9 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
     { data: activityData },
     statuses,
     team,
+    allTags,
+    allGroups,
+    submissionTags,
   ] = await Promise.all([
     subWithSource,
     // Pull the originating field's position in the same query, so we can
@@ -108,6 +112,9 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
       .order('created_at', { ascending: false }),
     loadStatuses(),
     loadTeam(),
+    loadTags(),
+    loadTagGroups(),
+    loadSubmissionTags(id),
   ]);
 
   let sub: SubmissionDetail | null = null;
@@ -134,6 +141,7 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
 
   const statusesById = Object.fromEntries(statuses.map((s) => [s.id, { label_ar: s.label_ar }]));
   const teamById = Object.fromEntries(team.map((t) => [t.id, { label: t.full_name || t.email }]));
+  const tagsById = Object.fromEntries(allTags.map((t) => [t.id, { label_ar: t.label_ar }]));
 
   const sortedAnswers = answers.slice().sort((a, b) => {
     const pa = a.field?.position ?? 9_999;
@@ -160,6 +168,12 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <TagPicker
+            submissionId={sub.id}
+            currentTagIds={submissionTags.map((t) => t.id)}
+            tags={allTags}
+            groups={allGroups}
+          />
           <StatusEditor submissionId={sub.id} currentStatusId={sub.status_id} statuses={statuses} />
           <AssigneePicker submissionId={sub.id} currentAssigneeId={sub.assignee_id} team={team} />
         </div>
@@ -209,7 +223,7 @@ export default async function SubmissionDetail({ params }: { params: Promise<{ i
         </div>
         <div className="space-y-5">
           <NotesPanel submissionId={sub.id} currentUserId={user.id} notes={notes} />
-          <ActivityFeed activity={activity} statusesById={statusesById} teamById={teamById} />
+          <ActivityFeed activity={activity} statusesById={statusesById} teamById={teamById} tagsById={tagsById} />
         </div>
       </div>
     </div>

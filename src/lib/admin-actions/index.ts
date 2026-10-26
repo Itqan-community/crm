@@ -10,6 +10,13 @@ export {
   deleteNote,
 } from './submissions';
 export { upsertStatus, deleteStatus } from './statuses';
+export {
+  upsertTag,
+  deleteTag,
+  setSubmissionTags,
+  upsertTagGroup,
+  deleteTagGroup,
+} from './tags';
 export { addAllowedEmail, removeAllowedEmail } from './team';
 export {
   upsertCategory,

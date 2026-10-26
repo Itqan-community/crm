@@ -276,6 +276,7 @@ describe('validateRows — duplicate detection', () => {
       category: null,
       status: null,
       assignee: null,
+      tags: [],
     },
   ];
 
