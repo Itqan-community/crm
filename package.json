@@ -23,8 +23,8 @@
     "googleapis": "^171.4.0",
     "i18n-iso-countries": "^7.14.0",
     "libphonenumber-js": "^1.12.42",
-    "mysql2": "^3.22.3",
-    "next": "^15.0.3",
+    "mysql2": "^3.23.1",
+    "next": "^16.4.3",
     "papaparse": "^5.5.3",
     "pg": "^8.20.0",
     "react": "^18.3.1",
@@ -47,9 +47,9 @@
     "eslint": "^9.14.0",
     "eslint-config-next": "^15.0.3",
     "jsdom": "^29.1.1",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.14",
+    "postcss": "^8.5.23",
+    "tailwindcss": "^4.3.3",
     "typescript": "^5.6.3",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.12"
   }
 }
